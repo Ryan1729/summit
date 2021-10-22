@@ -1,0 +1,8 @@
+#!/bin/bash
+
+command -v bat
+has_bat=$?
+
+test "$has_bat" = "0" && cargo build --color=always 2>&1 | bat
+test "$has_bat" != "0" && cargo build --color=always 2>&1 | less -R
+
