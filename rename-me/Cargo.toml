@@ -1,0 +1,13 @@
+[package]
+name = "rename-me"
+version = "0.1.0"
+authors = ["Ryan1729 <Ryan1729@gmail.com>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+game = { path = "../game" }
+raylib = { version = "3.5" }
+
+[features]
+default = []
