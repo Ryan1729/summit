@@ -111,28 +111,227 @@ pub use draw::{
     DrawW,
     DrawH,
     DrawWH,
-    SpriteKind
+    SpriteKind,
+    SpriteSpec,
+    Sizes,
 };
 
-#[derive(Copy, Clone, Debug)]
-pub enum Dir {
-    Up,
-    Down,
-    Left,
-    Right
+macro_rules! from_rng_enum_def {
+    ($name: ident { $( $variants: ident ),+ $(,)? }) => {
+        #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+        pub enum $name {
+            $( $variants ),+
+        }
+
+        impl $name {
+            pub const COUNT: usize = {
+                let mut count = 0;
+
+                $(
+                    // Some reference to the vars is needed to use
+                    // the repetitions.
+                    let _ = Self::$variants;
+
+                    count += 1;
+                )+
+
+                count
+            };
+
+            pub const ALL: [Self; Self::COUNT] = [
+                $(Self::$variants,)+
+            ];
+        
+            pub fn from_rng(rng: &mut Xs) -> Self {
+                Self::ALL[xs_u32(rng, 0, Self::ALL.len() as u32) as usize]
+            }
+        }
+    }
+}
+
+from_rng_enum_def!{
+    ArrowKind {
+        Red,
+        Green
+    }
+}
+
+impl Default for ArrowKind {
+    fn default() -> Self {
+        Self::Red
+    }
+}
+
+from_rng_enum_def!{
+    Dir {
+        Up,
+        UpRight,
+        Right,
+        DownRight,
+        Down,
+        DownLeft,
+        Left,
+        UpLeft,
+    }
+}
+
+impl Default for Dir {
+    fn default() -> Self {
+        Self::Up
+    }
+}
+
+mod tile {
+    pub type Count = u32;
+
+    pub type Coord = u8;
+
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct X(Coord);
+
+    impl X {
+        pub const MAX: Coord = 0b1111;
+        pub const COUNT: Count = (X::MAX as Count) + 1;
+    }
+
+    impl From<X> for Coord {
+        fn from(X(c): X) -> Self {
+            c
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct Y(Coord);
+
+    impl Y {
+        pub const MAX: Coord = 0b1111;
+        pub const COUNT: Count = (Y::MAX as Count) + 1;
+    }
+
+    impl From<Y> for Coord {
+        fn from(Y(c): Y) -> Self {
+            c
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+    pub struct XY {
+        pub x: X,
+        pub y: Y,
+    }
+
+    impl XY {
+        pub const COUNT: Count = X::COUNT * Y::COUNT;
+    }
+
+    #[allow(unused)]
+    pub fn xy_to_i(xy: XY) -> usize {
+        xy_to_i_usize((usize::from(xy.x.0), usize::from(xy.y.0)))
+    }
+
+    pub fn xy_to_i_usize((x, y): (usize, usize)) -> usize {
+        y * Y::COUNT as usize + x
+    }
+
+    pub fn i_to_xy(index: usize) -> XY {
+        XY {
+            x: X(to_coord_or_default(
+                (index % X::COUNT as usize) as Count
+            )),
+            y: Y(to_coord_or_default(
+                ((index % (XY::COUNT as usize) as usize) 
+                / X::COUNT as usize) as Count
+            )),
+        }
+    }
+
+    fn to_coord_or_default(n: Count) -> Coord {
+        core::convert::TryFrom::try_from(n).unwrap_or_default()
+    }
+}
+
+fn draw_xy_from_tile(sizes: &Sizes, txy: tile::XY) -> DrawXY {
+    DrawXY {
+        x: sizes.board_xywh.x + sizes.board_xywh.w * (tile::Coord::from(txy.x) as DrawLength / tile::X::COUNT as DrawLength),
+        y: sizes.board_xywh.y + sizes.board_xywh.h * (tile::Coord::from(txy.y) as DrawLength / tile::Y::COUNT as DrawLength),
+    }
+}
+
+/// A Tile should always be at a particular position, but that position should be 
+/// derivable from the tiles location in the tiles array, so it doesn't need to be
+/// stored. But, we often want to get the tile's data and it's location as a single
+/// thing. This is why we have both `Tile` and `TileData`
+#[derive(Copy, Clone, Debug, Default)]
+struct TileData {
+    dir: Dir,
+    arrow_kind: ArrowKind,
+}
+
+impl TileData {
+    fn from_rng(rng: &mut Xs) -> Self {
+        Self {
+            dir: Dir::from_rng(rng),
+            arrow_kind: ArrowKind::from_rng(rng),
+        }
+    }
+
+    fn sprite(&self) -> SpriteKind {
+        SpriteKind::Arrow(self.dir, self.arrow_kind)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+struct Tile {
+    xy: tile::XY,
+    data: TileData
+}
+
+pub const TILES_LENGTH: usize = tile::XY::COUNT as _;
+
+type TileDataArray = [TileData; TILES_LENGTH as _];
+
+#[derive(Clone, Debug)]
+pub struct Tiles {
+    tiles: TileDataArray,
+}
+
+impl Default for Tiles {
+    fn default() -> Self {
+        Self {
+            tiles: [TileData::default(); TILES_LENGTH as _],
+        }
+    }
+}
+
+impl Tiles {
+    fn from_rng(rng: &mut Xs) -> Self {
+        let mut tiles = [TileData::default(); TILES_LENGTH as _];
+
+        for i in 0..TILES_LENGTH {
+            tiles[i] = TileData::from_rng(rng);
+        }
+
+        Self {
+            tiles
+        }
+    }
 }
 
 #[derive(Debug, Default)]
 struct Board {
     rng: Xs,
+    tiles: Tiles,
 }
 
 impl Board {
     fn from_seed(seed: Seed) -> Self {
-        let rng = xs_from_seed(seed);
+        let mut rng = xs_from_seed(seed);
+
+        let tiles = Tiles::from_rng(&mut rng);
 
         Self {
             rng,
+            tiles,
             ..<_>::default()
         }
     }
@@ -223,7 +422,17 @@ pub fn update(
 
     let input = Input::from_flags(input_flags);
 
-    let board_xywh = &state.sizes.board_xywh;
+    for i in 0..TILES_LENGTH {
+        let tile_data = state.board.tiles.tiles[i];
+
+        let txy = tile::i_to_xy(i);
+
+        commands.push(Sprite(SpriteSpec{
+            sprite: tile_data.sprite(),
+            xy: draw_xy_from_tile(&state.sizes, txy),
+        }));
+    }
+
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
     const MARGIN: f32 = 16.;
@@ -240,7 +449,7 @@ pub fn update(
             ),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
-                w: board_xywh.x - left_text_x,
+                w: state.sizes.play_xywh.w,
                 h: small_section_h
             },
             kind: TextKind::UI,
@@ -250,13 +459,14 @@ pub fn update(
 
         commands.push(Text(TextSpec{
             text: format!(
-                "{:?}",
-                state,
+                "sizes: {:?}\nanimation_timer: {:?}",
+                state.sizes,
+                state.animation_timer
             ),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
-                w: board_xywh.x - left_text_x,
-                h: small_section_h
+                w: state.sizes.play_xywh.w,
+                h: state.sizes.play_xywh.h - y
             },
             kind: TextKind::UI,
         }));

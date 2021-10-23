@@ -19,9 +19,9 @@ const SAMPLING_SHADER: &str = include_str!("../assets/sampling.fs");
 
 const SPRITESHEET_BYTES: &[u8] = include_bytes!("../assets/spritesheet.png");
 
-const SPRITE_PIXELS_PER_TILE_SIDE: f32 = 128.0;
+const SPRITE_PIXELS_PER_TILE_SIDE: f32 = 16.0;
 
-use game::SpriteKind;
+use game::{SpriteKind, ArrowKind, Dir};
 
 struct SourceSpec {
     x: f32,
@@ -30,18 +30,37 @@ struct SourceSpec {
 }
 
 fn source_spec(sprite: SpriteKind) -> SourceSpec {
+    use ArrowKind::*;
+    use Dir::*;
     use SpriteKind::*;
 
     let sx = match sprite {
-        Hidden => 0.0
+        NeutralEye | Arrow(_, Red) => 0.,
+        Arrow(_, Green)| DirEye(_) => 1.
     };
 
     let sy = match sprite {
-        Hidden => 0.,
+        NeutralEye => 10.,
+        Arrow(Up, _) => 0.,
+        Arrow(UpRight, _) => 1.,
+        Arrow(Right, _) => 2.,
+        Arrow(DownRight, _) => 3.,
+        Arrow(Down, _) => 4.,
+        Arrow(DownLeft, _) => 5.,
+        Arrow(Left, _) => 6.,
+        Arrow(UpLeft, _) => 7.,
+        DirEye(Up) => 8.,
+        DirEye(UpRight) => 9.,
+        DirEye(Right) => 10.,
+        DirEye(DownRight) => 11.,
+        DirEye(Down) => 12.,
+        DirEye(DownLeft) => 13.,
+        DirEye(Left) => 14.,
+        DirEye(UpLeft) => 15.,
     };
 
     let rotation = match sprite {
-        Hidden => 0.,
+        _ => 0.,
     };
 
     SourceSpec {
@@ -187,7 +206,7 @@ mod raylib_rs_platform {
             }
         }
 
-        const SPRITE_BORDER: f32 = 4.;
+        const SPRITE_BORDER: f32 = 0.;
 
         let mut show_stats = false;
         use std::time::Instant;

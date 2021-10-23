@@ -68,7 +68,7 @@ pub struct DrawWH {
     pub h: DrawH,
 }
 
-pub type TileCount = u8;
+pub type TileCount = usize;
 pub type TileSideLength = DrawLength;
 
 #[derive(Clone, Debug, Default)]
@@ -81,7 +81,11 @@ pub struct Sizes {
 
 const LEFT_UI_WIDTH_TILES: TileCount = 9;
 const RIGHT_UI_WIDTH_TILES: TileCount = 9;
-const CENTER_UI_WIDTH_TILES: TileCount = 54;
+const CENTER_UI_WIDTH_TILES: TileCount = if crate::tile::X::COUNT < crate::tile::Y::COUNT {
+    crate::tile::X::COUNT as _
+} else {
+    crate::tile::Y::COUNT as _
+};
 const DRAW_WIDTH_TILES: TileCount = LEFT_UI_WIDTH_TILES 
     + CENTER_UI_WIDTH_TILES 
     + RIGHT_UI_WIDTH_TILES;
@@ -132,14 +136,18 @@ pub fn fresh_sizes(wh: DrawWH) -> Sizes {
     }
 }
 
+use crate::{ArrowKind, Dir};
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SpriteKind {
-    Hidden,
+    NeutralEye,
+    DirEye(Dir),
+    Arrow(Dir, ArrowKind),
 }
 
 impl Default for SpriteKind {
     fn default() -> Self {
-        Self::Hidden
+        Self::NeutralEye
     }
 }
 
