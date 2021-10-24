@@ -1,4 +1,5 @@
 #![deny(unused)]
+#![deny(bindings_with_variant_name)]
 
 // In case we decide that we care about no_std/not allocating
 type StrBuf = String;
@@ -143,6 +144,12 @@ pub enum SpriteKind {
     NeutralEye,
     DirEye(Dir),
     Arrow(Dir, ArrowKind),
+    SmallPupilEye,
+    NarrowLeftEye,
+    NarrowCenterEye,
+    NarrowRightEye,
+    ClosedEye,
+    HalfLidEye,
 }
 
 impl Default for SpriteKind {

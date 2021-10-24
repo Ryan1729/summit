@@ -1,4 +1,5 @@
 #![deny(unused)]
+#![deny(bindings_with_variant_name)]
 
 #[allow(unused)]
 macro_rules! compile_time_assert {
@@ -182,6 +183,8 @@ impl Default for Dir {
 }
 
 mod tile {
+    use crate::{Xs, xs_u32};
+
     pub type Count = u32;
 
     pub type Coord = u8;
@@ -192,6 +195,18 @@ mod tile {
     impl X {
         pub const MAX: Coord = 0b1111;
         pub const COUNT: Count = (X::MAX as Count) + 1;
+
+        pub fn from_rng(rng: &mut Xs) -> Self {
+            Self(xs_u32(rng, 0, Self::COUNT) as Coord)
+        }
+
+        pub fn saturating_add_one(&self) -> Self {
+            Self(core::cmp::min(self.0.saturating_add(1), Self::MAX))
+        }
+
+        pub fn saturating_sub_one(&self) -> Self {
+            Self(self.0.saturating_sub(1))
+        }
     }
 
     impl From<X> for Coord {
@@ -206,6 +221,18 @@ mod tile {
     impl Y {
         pub const MAX: Coord = 0b1111;
         pub const COUNT: Count = (Y::MAX as Count) + 1;
+
+        pub fn from_rng(rng: &mut Xs) -> Self {
+            Self(xs_u32(rng, 0, Self::COUNT) as Coord)
+        }
+
+        pub fn saturating_add_one(&self) -> Self {
+            Self(core::cmp::min(self.0.saturating_add(1), Self::MAX))
+        }
+
+        pub fn saturating_sub_one(&self) -> Self {
+            Self(self.0.saturating_sub(1))
+        }
     }
 
     impl From<Y> for Coord {
@@ -222,6 +249,29 @@ mod tile {
 
     impl XY {
         pub const COUNT: Count = X::COUNT * Y::COUNT;
+
+        pub fn from_rng(rng: &mut Xs) -> Self {
+            Self {
+                x: X::from_rng(rng),
+                y: Y::from_rng(rng),
+            }
+        }
+
+        pub fn move_up(&mut self) {
+            self.y = self.y.saturating_sub_one();
+        }
+
+        pub fn move_down(&mut self) {
+            self.y = self.y.saturating_add_one();
+        }
+
+        pub fn move_left(&mut self) {
+            self.x = self.x.saturating_sub_one();
+        }
+
+        pub fn move_right(&mut self) {
+            self.x = self.x.saturating_add_one();
+        }
     }
 
     #[allow(unused)]
@@ -317,10 +367,51 @@ impl Tiles {
     }
 }
 
+#[derive(Debug)]
+enum EyeState {
+    Idle,
+    Moved(Dir),
+    NarrowAnimLeft,
+    NarrowAnimCenter,
+    NarrowAnimRight,
+    SmallPupil,
+    Closed,
+    HalfLid,
+}
+
+impl Default for EyeState {
+    fn default() -> Self {
+        Self::Idle
+    }
+}
+
+impl EyeState {
+    fn sprite(&self) -> SpriteKind {
+        use EyeState::*;
+        match self {
+            Idle => SpriteKind::NeutralEye,
+            Moved(dir) => SpriteKind::DirEye(*dir),
+            NarrowAnimLeft => SpriteKind::NarrowLeftEye,
+            NarrowAnimCenter => SpriteKind::NarrowCenterEye,
+            NarrowAnimRight => SpriteKind::NarrowRightEye,
+            SmallPupil => SpriteKind::SmallPupilEye,
+            Closed => SpriteKind::ClosedEye,
+            HalfLid => SpriteKind::HalfLidEye,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+struct Eye {
+    xy: tile::XY,
+    state: EyeState,
+}
+
 #[derive(Debug, Default)]
 struct Board {
     rng: Xs,
     tiles: Tiles,
+    eye: Eye,
 }
 
 impl Board {
@@ -332,6 +423,10 @@ impl Board {
         Self {
             rng,
             tiles,
+            eye: Eye {
+                xy: tile::XY::from_rng(&mut rng),
+                ..<_>::default()
+            },
             ..<_>::default()
         }
     }
@@ -380,26 +475,32 @@ pub const INPUT_INTERACT_PRESSED: InputFlags        = 0b0000_0001_0000_0000;
 #[derive(Clone, Copy, Debug)]
 enum Input {
     NoChange,
-    Up,
-    Down,
-    Left,
-    Right,
+    Dir(Dir),
     Interact,
 }
 
 impl Input {
     fn from_flags(flags: InputFlags) -> Self {
         use Input::*;
+        use crate::Dir::*;
         if INPUT_INTERACT_PRESSED & flags != 0 {
             Interact
+        } else if (INPUT_UP_DOWN | INPUT_RIGHT_DOWN) & flags == (INPUT_UP_DOWN | INPUT_RIGHT_DOWN) {
+            Dir(UpRight)
+        } else if (INPUT_DOWN_DOWN | INPUT_RIGHT_DOWN) & flags == (INPUT_DOWN_DOWN | INPUT_RIGHT_DOWN) {
+            Dir(DownRight)
+        } else if (INPUT_DOWN_DOWN | INPUT_LEFT_DOWN) & flags == (INPUT_DOWN_DOWN | INPUT_LEFT_DOWN) {
+            Dir(DownLeft)
+        } else if (INPUT_UP_DOWN | INPUT_LEFT_DOWN) & flags == (INPUT_UP_DOWN | INPUT_LEFT_DOWN) {
+            Dir(UpRight)
         } else if INPUT_UP_DOWN & flags != 0 {
-            Up
+            Dir(Up)
         } else if INPUT_DOWN_DOWN & flags != 0 {
-            Down
+            Dir(Down)
         } else if INPUT_LEFT_DOWN & flags != 0 {
-            Left
+            Dir(Left)
         } else if INPUT_RIGHT_DOWN & flags != 0 {
-            Right
+            Dir(Right)
         } else {
             NoChange
         }
@@ -422,6 +523,94 @@ pub fn update(
 
     let input = Input::from_flags(input_flags);
 
+    use EyeState::*;
+    use Input::*;
+    use crate::Dir::*;
+
+    const HOLD_FRAMES: AnimationTimer = 30;
+
+    match input {
+        NoChange => match state.board.eye.state {
+            Idle => {
+                if state.animation_timer % (HOLD_FRAMES * 3) == 0 {
+                    state.board.eye.state = NarrowAnimCenter;
+                }
+            },
+            Moved(_) => {
+                if state.animation_timer % HOLD_FRAMES == 0 {
+                    state.board.eye.state = Idle;
+                }
+            },
+            SmallPupil => {
+                if state.animation_timer % (HOLD_FRAMES * 3) == 0 {
+                    state.board.eye.state = Closed;
+                }
+            },
+            Closed => {
+                if state.animation_timer % (HOLD_FRAMES) == 0 {
+                    state.board.eye.state = HalfLid;
+                }
+            },
+            HalfLid => {
+                if state.animation_timer % (HOLD_FRAMES * 5) == 0 {
+                    state.board.eye.state = Idle;
+                }
+            },
+            NarrowAnimCenter => {
+                let modulus = state.animation_timer % (HOLD_FRAMES * 4);
+                if modulus == 0 {
+                    state.board.eye.state = NarrowAnimRight;
+                } else if modulus == HOLD_FRAMES * 2 {
+                    state.board.eye.state = NarrowAnimLeft;
+                }
+            },
+            NarrowAnimLeft | NarrowAnimRight => {
+                if state.animation_timer % HOLD_FRAMES == 0 {
+                    state.board.eye.state = NarrowAnimCenter;
+                }
+            },
+        },
+        Dir(Up) => {
+            state.board.eye.state = Moved(Up);
+            state.board.eye.xy.move_up();
+        },
+        Dir(UpRight) => {
+            state.board.eye.state = Moved(UpRight);
+            state.board.eye.xy.move_up();
+            state.board.eye.xy.move_right();
+        },
+        Dir(Right) => {
+            state.board.eye.state = Moved(Right);
+            state.board.eye.xy.move_right();
+        },
+        Dir(DownRight) => {
+            state.board.eye.state = Moved(DownRight);
+            state.board.eye.xy.move_down();
+            state.board.eye.xy.move_right();
+        },
+        Dir(Down) => {
+            state.board.eye.state = Moved(Down);
+            state.board.eye.xy.move_down();
+        },
+        Dir(DownLeft) => {
+            state.board.eye.state = Moved(DownLeft);
+            state.board.eye.xy.move_down();
+            state.board.eye.xy.move_left();
+        },
+        Dir(Left) => {
+            state.board.eye.state = Moved(Left);
+            state.board.eye.xy.x = state.board.eye.xy.x.saturating_sub_one();
+        },
+        Dir(UpLeft) => {
+            state.board.eye.state = Moved(UpLeft);
+            state.board.eye.xy.move_up();
+            state.board.eye.xy.move_left();
+        },
+        Interact => {
+            state.board.eye.state = SmallPupil;
+        },
+    }
+
     for i in 0..TILES_LENGTH {
         let tile_data = state.board.tiles.tiles[i];
 
@@ -432,6 +621,11 @@ pub fn update(
             xy: draw_xy_from_tile(&state.sizes, txy),
         }));
     }
+
+    commands.push(Sprite(SpriteSpec{
+        sprite: state.board.eye.state.sprite(),
+        xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
+    }));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 

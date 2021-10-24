@@ -1,4 +1,5 @@
 //#![deny(unused)]
+#![deny(bindings_with_variant_name)]
 
 extern crate alloc;
 use alloc::vec::Vec;
@@ -35,12 +36,18 @@ fn source_spec(sprite: SpriteKind) -> SourceSpec {
     use SpriteKind::*;
 
     let sx = match sprite {
-        NeutralEye | Arrow(_, Red) => 0.,
+        NeutralEye 
+        | Arrow(_, Red)
+        | SmallPupilEye
+        | NarrowLeftEye
+        | NarrowCenterEye
+        | NarrowRightEye
+        | ClosedEye
+        | HalfLidEye => 0.,
         Arrow(_, Green)| DirEye(_) => 1.
     };
 
     let sy = match sprite {
-        NeutralEye => 10.,
         Arrow(Up, _) => 0.,
         Arrow(UpRight, _) => 1.,
         Arrow(Right, _) => 2.,
@@ -57,6 +64,13 @@ fn source_spec(sprite: SpriteKind) -> SourceSpec {
         DirEye(DownLeft) => 13.,
         DirEye(Left) => 14.,
         DirEye(UpLeft) => 15.,
+        ClosedEye => 8.,
+        HalfLidEye => 9.,
+        NeutralEye => 10.,
+        NarrowCenterEye => 11.,
+        NarrowRightEye => 12.,
+        NarrowLeftEye => 13.,
+        SmallPupilEye => 14.,
     };
 
     let rotation = match sprite {
