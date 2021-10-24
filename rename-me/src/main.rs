@@ -206,8 +206,6 @@ mod raylib_rs_platform {
             }
         }
 
-        const SPRITE_BORDER: f32 = 0.;
-
         let mut show_stats = false;
         use std::time::Instant;
         struct TimeSpan {
@@ -347,8 +345,8 @@ mod raylib_rs_platform {
                 let tile_base_source_rect = Rectangle {
                     x: 0.,
                     y: 0.,
-                    width: SPRITE_PIXELS_PER_TILE_SIDE - SPRITE_BORDER * 2.,
-                    height: SPRITE_PIXELS_PER_TILE_SIDE - SPRITE_BORDER * 2.,
+                    width: SPRITE_PIXELS_PER_TILE_SIDE,
+                    height: SPRITE_PIXELS_PER_TILE_SIDE,
                 };
     
                 let tile_base_render_rect = Rectangle {
@@ -358,6 +356,11 @@ mod raylib_rs_platform {
                     height: sizes.tile_side_length,
                 };
     
+                // I don't know why the texture lookup seems to be offset by these
+                // amounts, but it seems to be.
+                const X_SOURCE_FUDGE: f32 = -2.;
+                const Y_SOURCE_FUDGE: f32 = -1.;
+
                 for cmd in commands.0.iter() {
                     use game::draw::Command::*;
                     match cmd {
@@ -376,8 +379,8 @@ mod raylib_rs_platform {
                             };
 
                             let source_rect = Rectangle {
-                                x: spec.x + SPRITE_BORDER,
-                                y: spec.y + SPRITE_BORDER,
+                                x: spec.x + X_SOURCE_FUDGE,
+                                y: spec.y + Y_SOURCE_FUDGE,
                                 ..tile_base_source_rect
                             };
 
