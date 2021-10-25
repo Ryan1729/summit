@@ -27,7 +27,6 @@ use game::{SpriteKind, ArrowKind, Dir};
 struct SourceSpec {
     x: f32,
     y: f32,
-    rotation: f32,
 }
 
 fn source_spec(sprite: SpriteKind) -> SourceSpec {
@@ -73,14 +72,9 @@ fn source_spec(sprite: SpriteKind) -> SourceSpec {
         SmallPupilEye => 14.,
     };
 
-    let rotation = match sprite {
-        _ => 0.,
-    };
-
     SourceSpec {
         x: sx * SPRITE_PIXELS_PER_TILE_SIDE,
         y: sy * SPRITE_PIXELS_PER_TILE_SIDE,
-        rotation,
     }
 }
 
@@ -212,13 +206,6 @@ mod raylib_rs_platform {
         const TEXT: Color = WHITE;
         const NO_TINT: Color = WHITE;
         const OUTLINE: Color = WHITE;
-
-        fn tint_from_kind(sprite: game::SpriteKind) -> Color {
-            use game::SpriteKind::*;
-            match sprite {
-                Hidden => NO_TINT,
-            }
-        }
 
         let mut show_stats = false;
         use std::time::Instant;
@@ -403,8 +390,8 @@ mod raylib_rs_platform {
                                 source_rect,
                                 render_rect,
                                 origin,
-                                spec.rotation,
-                                tint_from_kind(s.sprite)
+                                0.0, // Rotation
+                                NO_TINT
                             );
                         }
                         Text(t) => {

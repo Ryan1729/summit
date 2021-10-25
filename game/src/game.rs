@@ -357,8 +357,8 @@ impl Tiles {
     fn from_rng(rng: &mut Xs) -> Self {
         let mut tiles = [TileData::default(); TILES_LENGTH as _];
 
-        for i in 0..TILES_LENGTH {
-            tiles[i] = TileData::from_rng(rng);
+        for tile_data in tiles.iter_mut() {
+            *tile_data = TileData::from_rng(rng);
         }
 
         Self {
@@ -427,7 +427,6 @@ impl Board {
                 xy: tile::XY::from_rng(&mut rng),
                 ..<_>::default()
             },
-            ..<_>::default()
         }
     }
 }

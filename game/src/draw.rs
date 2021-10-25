@@ -96,7 +96,7 @@ pub fn fresh_sizes(wh: DrawWH) -> Sizes {
     let h_length_bound = wh.h / CENTER_UI_WIDTH_TILES as DrawH;
 
     let (raw_bound, tile_side_length, board_x_offset, board_y_offset) = {
-        if w_length_bound == h_length_bound {
+        if (w_length_bound - h_length_bound).abs() < 0.5 {
             (h_length_bound, h_length_bound.trunc(), h_length_bound.fract() / 2., h_length_bound.fract() / 2.)
         } else if w_length_bound > h_length_bound {
             (h_length_bound, h_length_bound.trunc(), 0., h_length_bound.fract() / 2.)
