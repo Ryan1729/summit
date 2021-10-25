@@ -92,8 +92,9 @@ fn xs_from_seed(mut seed: Seed) -> Xs {
     ]
 }
 
-/// These type aliases make adding a custom newtype easy.
+/// This type alias makes adding a custom newtype easy.
 pub type X = f32;
+/// This type alias makes adding a custom newtype easy.
 pub type Y = f32;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
