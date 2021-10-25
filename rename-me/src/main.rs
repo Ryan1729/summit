@@ -1,4 +1,4 @@
-//#![deny(unused)]
+#![deny(unused)]
 #![deny(bindings_with_variant_name)]
 
 extern crate alloc;
