@@ -118,7 +118,7 @@ mod raylib_rs_platform {
 
     pub fn inner_main() {
         let (mut rl, thread) = raylib::init()
-        .size(0, 0)
+        .size(1920, 1080) // TODO read display size ourselves, since raylib gets the wrong answer
         .resizable()
         .title(WINDOW_TITLE)
         .build();
