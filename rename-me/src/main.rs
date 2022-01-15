@@ -35,7 +35,7 @@ fn source_spec(sprite: SpriteKind) -> SourceSpec {
     use SpriteKind::*;
 
     let sx = match sprite {
-        NeutralEye 
+        NeutralEye
         | Arrow(_, Red)
         | SmallPupilEye
         | NarrowLeftEye
@@ -117,11 +117,33 @@ mod raylib_rs_platform {
     }
 
     pub fn inner_main() {
-        let (mut rl, thread) = raylib::init()
-        .size(1920, 1080) // TODO read display size ourselves, since raylib gets the wrong answer
-        .resizable()
-        .title(WINDOW_TITLE)
-        .build();
+        let (mut rl, thread) = {
+            // TODO: Read display size ourselves, since while raylib tries to figure
+            // out the right size if `0, 0` is passed, it sometimes gets the wrong
+            // answer. In particular, on my current dev setup which uses Linux.
+            // Since as of this writing, I'm unable to find a small cross-platform
+            // crate for this, one option to get the info is to copy what the
+            // `winit` crate does. However, that turns out to be rather complicated,
+            // even just for x11, and hardcoding it for Linux currently seems
+            // preferable to either including winit as a dependency without using
+            // most of it, or spending the time to whittle away all the parts we
+            // don't need, since we just want the current monitor's size.
+            #[cfg(target_os = "linux")]
+            const W: i32 = 1920;
+            #[cfg(target_os = "linux")]
+            const H: i32 = 1080;
+
+            #[cfg(not(target_os = "linux"))]
+            const W: i32 = 0;
+            #[cfg(not(target_os = "linux"))]
+            const H: i32 = 0;
+
+            raylib::init()
+            .size(W, H)
+            .resizable()
+            .title(WINDOW_TITLE)
+            .build()
+        };
 
         if cfg!(debug_assertions) {
             logging::set_trace_log(TraceLogLevel::LOG_WARNING);
@@ -174,7 +196,7 @@ mod raylib_rs_platform {
         // out what to do if we get a smaller value than this.
 //        const RENDER_TARGET_SIZE: u32 = 8192;
         // On the other hand, 8192 makes my old intergrated graphics laptop overheat
-        // Maybe it would be faster/less hot to avoiding clearing the whole thing 
+        // Maybe it would be faster/less hot to avoiding clearing the whole thing
         // each frame?
         const RENDER_TARGET_SIZE: u32 = 2048;
 
@@ -187,15 +209,15 @@ mod raylib_rs_platform {
 
         let seed: u128 = {
             use std::time::SystemTime;
-    
-            let duration = match 
+
+            let duration = match
                 SystemTime::now()
                     .duration_since(SystemTime::UNIX_EPOCH)
             {
                 Ok(d) => d,
                 Err(err) => err.duration(),
             };
-    
+
             duration.as_nanos()
         };
         println!("{}", seed);
@@ -287,7 +309,7 @@ mod raylib_rs_platform {
             if rl.is_key_pressed(KEY_UP) || rl.is_key_pressed(KEY_W) {
                 input_flags |= game::INPUT_UP_PRESSED;
             }
-            
+
             if rl.is_key_pressed(KEY_DOWN) || rl.is_key_pressed(KEY_S) {
                 input_flags |= game::INPUT_DOWN_PRESSED;
             }
@@ -347,21 +369,21 @@ mod raylib_rs_platform {
                     sizes.play_xywh.h as i32 + 2,
                     OUTLINE
                 );
-            
+
                 let tile_base_source_rect = Rectangle {
                     x: 0.,
                     y: 0.,
                     width: SPRITE_PIXELS_PER_TILE_SIDE,
                     height: SPRITE_PIXELS_PER_TILE_SIDE,
                 };
-    
+
                 let tile_base_render_rect = Rectangle {
                     x: 0.,
                     y: 0.,
                     width: sizes.tile_side_length,
                     height: sizes.tile_side_length,
                 };
-    
+
                 // I don't know why the texture lookup seems to be offset by these
                 // amounts, but it seems to be.
                 const X_SOURCE_FUDGE: f32 = -2.;
