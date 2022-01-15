@@ -158,7 +158,12 @@ mod raylib_rs_platform {
             "Embedded spritesheet could not be loaded!"
         );
 
-        let grid_shader = rl. load_shader_from_memory(
+        // This call currently (sometimes?) produces warnings about not being able
+        // to find shader attributes/uniforms. These warnings seem harmless at the
+        // moment. I think the cause is that the unused parts are being optimized
+        // out by the GPU when it interprets the shader, as mentioned here:
+        // https://github.com/raysan5/raylib/issues/2211
+        let grid_shader = rl.load_shader_from_memory(
             &thread,
             None,
             Some(SAMPLING_SHADER)
