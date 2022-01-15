@@ -331,12 +331,6 @@ impl TileData {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
-struct Tile {
-    xy: tile::XY,
-    data: TileData
-}
-
 pub const TILES_LENGTH: usize = tile::XY::COUNT as _;
 
 type TileDataArray = [TileData; TILES_LENGTH as _];
@@ -410,7 +404,6 @@ struct Eye {
 
 #[derive(Debug, Default)]
 struct Board {
-    rng: Xs,
     tiles: Tiles,
     eye: Eye,
 }
@@ -422,7 +415,6 @@ impl Board {
         let tiles = Tiles::from_rng(&mut rng);
 
         Self {
-            rng,
             tiles,
             eye: Eye {
                 xy: tile::XY::from_rng(&mut rng),
