@@ -7,7 +7,10 @@ license = "MIT OR Apache-2.0"
 
 [dependencies]
 game = { path = "../game" }
-raylib = { version = "3.5" }
+# Pin the version, including raylib-sys becasue as of this writing, the raylib
+# packages do not follow semver.
+raylib = "= 3.7.0"
+raylib-sys = "= 3.7.0"
 
 [features]
 default = []

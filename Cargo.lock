@@ -9,6 +9,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "79c2681d6594606957bbb8631c4b90a7fcaaa72cdb714743a437b156d6a7eedd"
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "cmake"
 version = "0.1.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -41,10 +47,11 @@ checksum = "7b2f96d100e1cf1929e7719b7edb3b90ab5298072638fccd77be9ce942ecdfce"
 
 [[package]]
 name = "raylib"
-version = "3.5.0"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7d3df0dcf9b202552b74c715028224a04ca89443a1e4706382798aa6b13c85a0"
+checksum = "fb567269b7ea9ae3c4a5aab4dc95e0b4d8df2a49a25e1670a3bb17bc17504606"
 dependencies = [
+ "cfg-if",
  "lazy_static",
  "libc",
  "raylib-sys",
@@ -52,9 +59,9 @@ dependencies = [
 
 [[package]]
 name = "raylib-sys"
-version = "3.5.0"
+version = "3.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e2a71751cbdfb2beaa9ca806ec223525c182778e6ef123378898f99f1b1b30c"
+checksum = "20c97b5e251b73c52183914d4756104cab401050f244c19abe83fa05a4e86840"
 dependencies = [
  "cc",
  "cmake",
@@ -67,4 +74,5 @@ version = "0.1.0"
 dependencies = [
  "game",
  "raylib",
+ "raylib-sys",
 ]

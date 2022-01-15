@@ -124,7 +124,7 @@ mod raylib_rs_platform {
         .build();
 
         if cfg!(debug_assertions) {
-            logging::set_trace_log_exit(TraceLogType::LOG_WARNING);
+            logging::set_trace_log(TraceLogLevel::LOG_WARNING);
         }
 
         rl.set_target_fps(60);
@@ -140,7 +140,7 @@ mod raylib_rs_platform {
 
             let bytes = SPRITESHEET_BYTES.as_ptr();
 
-            let file_type = b"PNG\0" as *const u8 as *const i8;
+            let file_type = b".png\0" as *const u8 as *const i8;
 
             unsafe {
                 Image::from_raw(LoadImageFromMemory(
@@ -158,7 +158,7 @@ mod raylib_rs_platform {
             "Embedded spritesheet could not be loaded!"
         );
 
-        let grid_shader = rl.load_shader_code(
+        let grid_shader = rl. load_shader_from_memory(
             &thread,
             None,
             Some(SAMPLING_SHADER)
