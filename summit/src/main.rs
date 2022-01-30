@@ -78,7 +78,7 @@ fn source_spec(sprite: SpriteKind) -> SourceSpec {
     }
 }
 
-const WINDOW_TITLE: &str = "rename-me";
+const WINDOW_TITLE: &str = "summit";
 
 fn main() {
     raylib_rs_platform::inner_main();

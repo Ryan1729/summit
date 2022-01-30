@@ -1,15 +1,6 @@
-# Raylib-rs Template
+# Summit
 
-This is a template for new Rust projects that use [raylib-rs](https://github.com/deltaphc/raylib-rs). This is mainly designed for my (@Ryan1729) own purposes.
-
-That said, I am sharing this publically, so it's worth noting some things about the license. I used the MIT OR Apache-2.0 license for this template since that is the license I plan to apply to my own projects that use this template, by default.
-
-I have no interest in trying to claim ownership over anyone else's projects that started by using this template. Redistribution of the template itself, as an unfilled template, can use the MIT OR Apache-2.0 license.
-
-# Using the template
-
-Basically, if the building/running instructions work then all you need to do is copy this tempalte to a new folder, optionally run `git init`, rename the `rename-me` folder, update the references, the licenses, and this README itself.
-See the included `checklist` script for more details if needed.
+This is a game inspired by [Mt.](https://lukeoc.itch.io/mt)
 
 # Building/Running
 

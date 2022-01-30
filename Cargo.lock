@@ -69,7 +69,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "rename-me"
+name = "summit"
 version = "0.1.0"
 dependencies = [
  "game",
