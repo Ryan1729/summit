@@ -230,6 +230,7 @@ mod raylib_rs_platform {
 
         const BACKGROUND: Color = Color{ r: 0x22, g: 0x22, b: 0x22, a: 255 };
         const WHITE: Color = Color{ r: 0xee, g: 0xee, b: 0xee, a: 255 };
+        const STONE: Color = Color{ r: 0x5a, g: 0x7d, b: 0x8b, a: 255 };
         const TEXT: Color = WHITE;
         const NO_TINT: Color = WHITE;
         const OUTLINE: Color = WHITE;
@@ -390,7 +391,7 @@ mod raylib_rs_platform {
                 const Y_SOURCE_FUDGE: f32 = -1.;
 
                 for cmd in commands.0.iter() {
-                    use game::draw::Command::*;
+                    use game::draw::{DrawXY, Command::*};
                     match cmd {
                         Sprite(s) => {
                             let spec = source_spec(s.sprite);
@@ -442,6 +443,17 @@ mod raylib_rs_platform {
                                     );
                                 },
                             };
+                        },
+                        TriangleStrip(strip) => {
+                            let vectors: Vec<_> = strip
+                                .iter()
+                                .map(|DrawXY{x, y}| Vector2{x: *x, y: *y})
+                                .collect();
+
+                            shader_d.draw_triangle_strip(
+                                &vectors,
+                                STONE
+                            );
                         }
                     }
                 }

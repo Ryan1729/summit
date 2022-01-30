@@ -40,6 +40,10 @@ fn xs_u32(xs: &mut Xs, min: u32, one_past_max: u32) -> u32 {
     (xorshift(xs) % (one_past_max - min)) + min
 }
 
+fn xs_range(xs: &mut Xs, range: core::ops::Range<u32>) -> u32 {
+    xs_u32(xs, range.start, range.end)
+}
+
 #[allow(unused)]
 fn xs_shuffle<A>(rng: &mut Xs, slice: &mut [A]) {
     for i in 1..slice.len() as u32 {
@@ -402,10 +406,32 @@ struct Eye {
     state: EyeState,
 }
 
+// Short for "zero-one", which seemed better than `_01`.
+mod zo {
+    /// Values outside the range [0, 1] are expected, but they are expected to be
+    /// clipped later.
+    pub type Zo = f32;
+
+    #[derive(Debug, Default)]
+    pub struct X(pub(crate) Zo);
+
+    #[derive(Debug, Default)]
+    pub struct Y(pub(crate) Zo);
+
+    #[derive(Debug, Default)]
+    pub struct XY {
+        pub x: X,
+        pub y: Y,
+    }
+}
+
+type Triangles = Vec<zo::XY>;
+
 #[derive(Debug, Default)]
 struct Board {
     tiles: Tiles,
     eye: Eye,
+    triangles: Triangles,
 }
 
 impl Board {
@@ -414,12 +440,29 @@ impl Board {
 
         let tiles = Tiles::from_rng(&mut rng);
 
+        let triangle_count = 16;
+        let point_count = 2 + triangle_count;
+
+        let mut triangles = Vec::with_capacity(point_count);
+
+        for _ in 0..point_count {
+            // TODO ensure these form one solid shape, without overlaps.
+
+            const ONE_SCREEN: u32 = 65536; 
+            // Generate some points outside the screen.
+            let x = ((xs_range(&mut rng, 0..ONE_SCREEN * 3) as f32) / ONE_SCREEN as f32) - 1.;
+            let y = ((xs_range(&mut rng, 0..ONE_SCREEN * 3) as f32) / ONE_SCREEN as f32) - 1.;
+            
+            triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
+        }
+
         Self {
             tiles,
             eye: Eye {
                 xy: tile::XY::from_rng(&mut rng),
                 ..<_>::default()
             },
+            triangles,
         }
     }
 }
@@ -618,6 +661,19 @@ pub fn update(
         sprite: state.board.eye.state.sprite(),
         xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
     }));
+
+    let strip: draw::TriangleStrip = state.board.triangles
+        .iter()
+        .map(|tri| {
+            DrawXY {
+                x: state.sizes.board_xywh.w * tri.x.0,
+                y: state.sizes.board_xywh.w * tri.y.0,
+            }
+        })
+        .collect();
+    
+
+    commands.push(TriangleStrip(strip));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
