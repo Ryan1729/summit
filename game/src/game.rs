@@ -40,6 +40,7 @@ fn xs_u32(xs: &mut Xs, min: u32, one_past_max: u32) -> u32 {
     (xorshift(xs) % (one_past_max - min)) + min
 }
 
+#[allow(unused)]
 fn xs_range(xs: &mut Xs, range: core::ops::Range<u32>) -> u32 {
     xs_u32(xs, range.start, range.end)
 }
@@ -436,25 +437,71 @@ struct Board {
 
 impl Board {
     fn from_seed(seed: Seed) -> Self {
+        #![allow(unused)] // TODO remove
+
         let mut rng = xs_from_seed(seed);
 
         let tiles = Tiles::from_rng(&mut rng);
 
-        let triangle_count = 16;
+        let triangle_count = 8;
         let point_count = 2 + triangle_count;
 
         let mut triangles = Vec::with_capacity(point_count);
 
+        use zo::{XY, X, Y};
+        triangles.push(XY {
+            x: X(
+                0.,
+            ),
+            y: Y(
+                1.,
+            ),
+        });
+        triangles.push(XY {
+            x: X(
+                1.,
+            ),
+            y: Y(
+                1.,
+            ),
+        });
+        triangles.push(XY {
+            x: X(
+                1.,
+            ),
+            y: Y(
+                0.,
+            ),
+        });
+    
+        //triangles.sort_by(|a, b| { a.x.0.partial_cmp(&b.x.0).unwrap_or(core::cmp::Ordering::Less) });
+
+        const ONE_SCREEN: u32 = 65536;
+
+        /*
+        let mut x_base = 0;
+        let mut y_base = 0;
+    
         for _ in 0..point_count {
             // TODO ensure these form one solid shape, without overlaps.
 
-            const ONE_SCREEN: u32 = 65536; 
             // Generate some points outside the screen.
-            let x = ((xs_range(&mut rng, 0..ONE_SCREEN * 3) as f32) / ONE_SCREEN as f32) - 1.;
-            let y = ((xs_range(&mut rng, 0..ONE_SCREEN * 3) as f32) / ONE_SCREEN as f32) - 1.;
+            let x_u32 = xs_range(&mut rng, x_base..ONE_SCREEN * 3);
+            let y_u32 = xs_range(&mut rng, y_base..ONE_SCREEN * 3);
+
+            const SCALE: f32 = 1./1.;
+
+            let x = ((x_u32 as f32 / ONE_SCREEN as f32) - 1.) * SCALE;
+            let y = ((y_u32 as f32 / ONE_SCREEN as f32) - 1.) * SCALE;
             
             triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
+
+            x_base += xs_range(&mut rng, 0..ONE_SCREEN >> 8);
+            y_base += xs_range(&mut rng, 0..ONE_SCREEN >> 8);
         }
+        */
+
+dbg!(&triangles);
 
         Self {
             tiles,
@@ -666,8 +713,8 @@ pub fn update(
         .iter()
         .map(|tri| {
             DrawXY {
-                x: state.sizes.board_xywh.w * tri.x.0,
-                y: state.sizes.board_xywh.w * tri.y.0,
+                x: state.sizes.board_xywh.x + state.sizes.board_xywh.w * tri.x.0,
+                y: state.sizes.board_xywh.y + state.sizes.board_xywh.h * tri.y.0,
             }
         })
         .collect();
