@@ -446,61 +446,71 @@ impl Board {
         let triangle_count = 8;
         let point_count = 2 + triangle_count;
 
-        let mut triangles = Vec::with_capacity(point_count);
+        let mut triangles = Vec::with_capacity(point_count as usize);
 
+        macro_rules! xy {
+            ($x: expr, $y: expr) => {
+                XY {
+                    x: X(
+                        $x,
+                    ),
+                    y: Y(
+                        $y,
+                    ),
+                }
+            }
+        }
+
+        #[cfg(any())] {
         use zo::{XY, X, Y};
-        triangles.push(XY {
-            x: X(
-                0.,
-            ),
-            y: Y(
-                1.,
-            ),
-        });
-        triangles.push(XY {
-            x: X(
-                1.,
-            ),
-            y: Y(
-                1.,
-            ),
-        });
-        triangles.push(XY {
-            x: X(
-                1.,
-            ),
-            y: Y(
-                0.,
-            ),
-        });
-    
-        //triangles.sort_by(|a, b| { a.x.0.partial_cmp(&b.x.0).unwrap_or(core::cmp::Ordering::Less) });
+        triangles.push(xy!(0., 1.));
+        triangles.push(xy!(1., 1.));
+        triangles.push(xy!(1., 0.));
 
+        //triangles.sort_by(|a, b| { a.x.0.partial_cmp(&b.x.0).unwrap_or(core::cmp::Ordering::Less) });
+        }
         const ONE_SCREEN: u32 = 65536;
 
-        /*
-        let mut x_base = 0;
-        let mut y_base = 0;
-    
-        for _ in 0..point_count {
-            // TODO ensure these form one solid shape, without overlaps.
+        const BOTTOM_Y: f32 = 1.0;
 
-            // Generate some points outside the screen.
-            let x_u32 = xs_range(&mut rng, x_base..ONE_SCREEN * 3);
-            let y_u32 = xs_range(&mut rng, y_base..ONE_SCREEN * 3);
+        let delta = ONE_SCREEN / triangle_count;
+
+        // TODO write a function that takes 
+        // [xy!(0., BOTTOM_Y), xy!(0.55, 0.45), xy!(1., 0.)] and produces the below
+        // set of points.
+
+        use zo::{XY, X, Y};
+        triangles.push(xy!(0., BOTTOM_Y));
+        triangles.push(xy!(0.55, BOTTOM_Y));
+        triangles.push(xy!(0.55, 0.45));
+        triangles.push(xy!(1., BOTTOM_Y));
+        triangles.push(xy!(1., 0.));
+
+        //... Maybe that function should go in the platform layer?
+
+/*
+        let mut x_base = ONE_SCREEN / 2;
+        let mut y_base = ONE_SCREEN;
+    
+        for i in 0..point_count {            
+            let x_u32 = x_base;//xs_range(&mut rng, x_base..ONE_SCREEN * 3);
+            let y_u32 = y_base;//xs_range(&mut rng, y_base..ONE_SCREEN * 3);
 
             const SCALE: f32 = 1./1.;
 
             let x = ((x_u32 as f32 / ONE_SCREEN as f32) - 1.) * SCALE;
-            let y = ((y_u32 as f32 / ONE_SCREEN as f32) - 1.) * SCALE;
-            
+            let y = if i % 2 == 0 {
+                BOTTOM_Y
+            } else {
+                ((y_u32 as f32 / ONE_SCREEN as f32) - 1.) * SCALE
+            };
+
             triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
 
-            x_base += xs_range(&mut rng, 0..ONE_SCREEN >> 8);
-            y_base += xs_range(&mut rng, 0..ONE_SCREEN >> 8);
+            x_base += delta + xs_range(&mut rng, 0..ONE_SCREEN >> 8);
+            y_base += delta + xs_range(&mut rng, 0..ONE_SCREEN >> 8);
         }
-        */
-
+*/
 dbg!(&triangles);
 
         Self {
