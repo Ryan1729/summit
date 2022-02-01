@@ -521,32 +521,68 @@ impl Board {
 
         let tiles = Tiles::from_rng(&mut rng);
 
-        let triangle_count = 8;
-        let point_count = 2 + triangle_count;
+        let triangle_count = 128;
+        let overall_count = 2 + triangle_count;
 
-        let mut triangles = Vec::with_capacity(point_count as usize);
+        let mut triangles = Vec::with_capacity(overall_count as usize);
+
+        use zo::{XY, X, Y};
 
         #[cfg(any())] {
-        use zo::{XY, X, Y};
-        triangles.push(zo_xy!(0., 1.));
-        triangles.push(zo_xy!(1., 1.));
-        triangles.push(zo_xy!(1., 0.));
+            triangles.push(zo_xy!(0., 1.));
+            triangles.push(zo_xy!(1., 1.));
+            triangles.push(zo_xy!(1., 0.));
         }
-        const ONE_SCREEN: u32 = 65536;
 
-        let delta = ONE_SCREEN / triangle_count;
+        let path_count = (triangle_count / 2) + 1;
 
-        use zo::{XY, X, Y};
-        push_floor_triangles_from_path(
-            &mut triangles,
-            &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.25, 0.75), zo_xy!(0.5, 0.25), zo_xy!(0.75, 0.75), zo_xy!(1., BOTTOM_Y)]
-        );
+        let x_delta = 1. / path_count as f32;
+        // We want some leftover y space
+        let y_delta = x_delta * 0.75;
+
+        let mut path = Vec::with_capacity(path_count as usize);
+
+        let mut x_base = 0.;
+        let mut y_base = 0.;
+
+        assert!(path_count >= 1);
+        path.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+
+        x_base += x_delta;
+        y_base += y_delta;
+
+        const SCALE: u32 = 65536;
+
+        macro_rules! rf32 {
+            () => {
+                xs_range(&mut rng, 0..SCALE) as f32 / SCALE as f32
+            }
+        }
+
+        // `y` can be spikier.
+        const Y_SPIKE_FACTOR: f32 = 16.;
+
+        for i in 1..path_count - 1 {
+            let x = x_base + (x_delta / 2.) * rf32!();
+            let y = y_base + y_delta * Y_SPIKE_FACTOR * rf32!();
+
+            path.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
+
+            x_base += x_delta;
+            y_base += y_delta;
+        }
+
+        assert!(path_count >= 2);
+        path.push(zo::XY{
+            x: zo::X(1.),
+            // The summit must be the highest point
+            y: zo::Y(y_base + y_delta * (Y_SPIKE_FACTOR + 1.))
+        });
 
 /*
-        let mut x_base = ONE_SCREEN / 2;
-        let mut y_base = ONE_SCREEN;
+
     
-        for i in 0..point_count {            
+        for i in 0..point_count {
             let x_u32 = x_base;//xs_range(&mut rng, x_base..ONE_SCREEN * 3);
             let y_u32 = y_base;//xs_range(&mut rng, y_base..ONE_SCREEN * 3);
 
@@ -565,7 +601,13 @@ impl Board {
             y_base += delta + xs_range(&mut rng, 0..ONE_SCREEN >> 8);
         }
 */
-dbg!(&triangles);
+
+        dbg!(&path);
+
+        push_floor_triangles_from_path(
+            &mut triangles,
+            &path
+        );
 
         Self {
             tiles,
