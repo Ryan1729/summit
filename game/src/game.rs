@@ -442,7 +442,8 @@ mod zo {
 
 type Triangles = Vec<zo::XY>;
 
-pub const BOTTOM_Y: f32 = 1.0;
+pub const TOP_Y: f32 = 1.0;
+pub const BOTTOM_Y: f32 = 0.0;
 
 fn push_floor_triangles_from_path(
     triangles: &mut Triangles,
@@ -530,8 +531,6 @@ impl Board {
         triangles.push(zo_xy!(0., 1.));
         triangles.push(zo_xy!(1., 1.));
         triangles.push(zo_xy!(1., 0.));
-
-        //triangles.sort_by(|a, b| { a.x.0.partial_cmp(&b.x.0).unwrap_or(core::cmp::Ordering::Less) });
         }
         const ONE_SCREEN: u32 = 65536;
 
@@ -779,7 +778,7 @@ pub fn update(
         .map(|tri| {
             DrawXY {
                 x: state.sizes.board_xywh.x + state.sizes.board_xywh.w * tri.x.0,
-                y: state.sizes.board_xywh.y + state.sizes.board_xywh.h * tri.y.0,
+                y: state.sizes.board_xywh.y + state.sizes.board_xywh.h * (TOP_Y - tri.y.0),
             }
         })
         .collect();
