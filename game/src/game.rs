@@ -413,20 +413,97 @@ mod zo {
     /// clipped later.
     pub type Zo = f32;
 
-    #[derive(Debug, Default)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
     pub struct X(pub(crate) Zo);
 
-    #[derive(Debug, Default)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
     pub struct Y(pub(crate) Zo);
 
-    #[derive(Debug, Default)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq)]
     pub struct XY {
         pub x: X,
         pub y: Y,
     }
+
+    #[macro_export]
+    macro_rules! zo_xy {
+        ($x: expr, $y: expr) => {
+            XY {
+                x: X(
+                    $x,
+                ),
+                y: Y(
+                    $y,
+                ),
+            }
+        }
+    }
 }
 
 type Triangles = Vec<zo::XY>;
+
+pub const BOTTOM_Y: f32 = 1.0;
+
+fn push_floor_triangles_from_path(
+    triangles: &mut Triangles,
+    path: &[zo::XY],
+) {
+    use zo::{XY, X, Y};
+    if path.is_empty() {
+        return;
+    }
+
+    triangles.push(path[0]);
+
+    for &xy in &path[1..] {
+        triangles.push(zo_xy!(xy.x.0, BOTTOM_Y));
+        triangles.push(xy);
+    }
+}
+
+#[test]
+fn push_floor_triangles_from_path_works_on_this_small_example() {
+    use zo::{XY, X, Y};
+
+    let mut triangles = Triangles::with_capacity(5);
+
+    push_floor_triangles_from_path(
+        &mut triangles,
+        &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.55, 0.45)]
+    );
+
+    assert_eq!(
+        triangles,
+        vec![
+            zo_xy!(0., BOTTOM_Y),
+            zo_xy!(0.55, BOTTOM_Y),
+            zo_xy!(0.55, 0.45),
+        ]
+    );
+}
+
+#[test]
+fn push_floor_triangles_from_path_works_on_the_initial_example() {
+    use zo::{XY, X, Y};
+
+    let mut triangles = Triangles::with_capacity(5);
+
+    push_floor_triangles_from_path(
+        &mut triangles,
+        &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.55, 0.45), zo_xy!(1., 0.)]
+    );
+
+    assert_eq!(
+        triangles,
+        vec![
+            zo_xy!(0., BOTTOM_Y),
+            zo_xy!(0.55, BOTTOM_Y),
+            zo_xy!(0.55, 0.45),
+            zo_xy!(1., BOTTOM_Y),
+            zo_xy!(1., 0.),
+        ]
+    );
+}
 
 #[derive(Debug, Default)]
 struct Board {
@@ -448,45 +525,23 @@ impl Board {
 
         let mut triangles = Vec::with_capacity(point_count as usize);
 
-        macro_rules! xy {
-            ($x: expr, $y: expr) => {
-                XY {
-                    x: X(
-                        $x,
-                    ),
-                    y: Y(
-                        $y,
-                    ),
-                }
-            }
-        }
-
         #[cfg(any())] {
         use zo::{XY, X, Y};
-        triangles.push(xy!(0., 1.));
-        triangles.push(xy!(1., 1.));
-        triangles.push(xy!(1., 0.));
+        triangles.push(zo_xy!(0., 1.));
+        triangles.push(zo_xy!(1., 1.));
+        triangles.push(zo_xy!(1., 0.));
 
         //triangles.sort_by(|a, b| { a.x.0.partial_cmp(&b.x.0).unwrap_or(core::cmp::Ordering::Less) });
         }
         const ONE_SCREEN: u32 = 65536;
 
-        const BOTTOM_Y: f32 = 1.0;
-
         let delta = ONE_SCREEN / triangle_count;
 
-        // TODO write a function that takes 
-        // [xy!(0., BOTTOM_Y), xy!(0.55, 0.45), xy!(1., 0.)] and produces the below
-        // set of points.
-
         use zo::{XY, X, Y};
-        triangles.push(xy!(0., BOTTOM_Y));
-        triangles.push(xy!(0.55, BOTTOM_Y));
-        triangles.push(xy!(0.55, 0.45));
-        triangles.push(xy!(1., BOTTOM_Y));
-        triangles.push(xy!(1., 0.));
-
-        //... Maybe that function should go in the platform layer?
+        push_floor_triangles_from_path(
+            &mut triangles,
+            &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.25, 0.75), zo_xy!(0.5, 0.25), zo_xy!(0.75, 0.75), zo_xy!(1., BOTTOM_Y)]
+        );
 
 /*
         let mut x_base = ONE_SCREEN / 2;
