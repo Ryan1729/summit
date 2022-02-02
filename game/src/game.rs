@@ -579,28 +579,17 @@ impl Board {
             y: zo::Y(y_base + y_delta * (Y_SPIKE_FACTOR + 1.))
         });
 
-/*
+        // TODO Generate down slope too. Make a function that generate n path
+        // points upward, and another that genrerates n path points downward?
+        // Then we can link them together, and later swap in new functions.
 
-    
-        for i in 0..point_count {
-            let x_u32 = x_base;//xs_range(&mut rng, x_base..ONE_SCREEN * 3);
-            let y_u32 = y_base;//xs_range(&mut rng, y_base..ONE_SCREEN * 3);
+        // TODO make a function that deterministically produces the simplest
+        // overhang.
 
-            const SCALE: f32 = 1./1.;
+        // TODO make a function that generates the a random variation on the 
+        // simplest overhang.
 
-            let x = ((x_u32 as f32 / ONE_SCREEN as f32) - 1.) * SCALE;
-            let y = if i % 2 == 0 {
-                BOTTOM_Y
-            } else {
-                ((y_u32 as f32 / ONE_SCREEN as f32) - 1.) * SCALE
-            };
-
-            triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
-
-            x_base += delta + xs_range(&mut rng, 0..ONE_SCREEN >> 8);
-            y_base += delta + xs_range(&mut rng, 0..ONE_SCREEN >> 8);
-        }
-*/
+        // TODO make a function that deterministically produces a spiral overhang.
 
         dbg!(&path);
 
