@@ -40,8 +40,10 @@ fn xs_u32(xs: &mut Xs, min: u32, one_past_max: u32) -> u32 {
     (xorshift(xs) % (one_past_max - min)) + min
 }
 
+use core::ops::Range;
+
 #[allow(unused)]
-fn xs_range(xs: &mut Xs, range: core::ops::Range<u32>) -> u32 {
+fn xs_range(xs: &mut Xs, range: Range<u32>) -> u32 {
     xs_u32(xs, range.start, range.end)
 }
 
@@ -427,7 +429,7 @@ mod zo {
 
     #[macro_export]
     macro_rules! zo_xy {
-        ($x: expr, $y: expr) => {
+        ($x: expr, $y: expr $(,)?) => {
             XY {
                 x: X(
                     $x,
@@ -441,34 +443,35 @@ mod zo {
 }
 
 type Triangles = Vec<zo::XY>;
+type Edge = Vec<zo::XY>;
 
 pub const TOP_Y: f32 = 1.0;
 pub const BOTTOM_Y: f32 = 0.0;
 
-fn push_floor_triangles_from_path(
+fn push_floor_triangles_from_edge(
     triangles: &mut Triangles,
-    path: &[zo::XY],
+    edge: &[zo::XY],
 ) {
     use zo::{XY, X, Y};
-    if path.is_empty() {
+    if edge.is_empty() {
         return;
     }
 
-    triangles.push(path[0]);
+    triangles.push(edge[0]);
 
-    for &xy in &path[1..] {
+    for &xy in &edge[1..] {
         triangles.push(zo_xy!(xy.x.0, BOTTOM_Y));
         triangles.push(xy);
     }
 }
 
 #[test]
-fn push_floor_triangles_from_path_works_on_this_small_example() {
+fn push_floor_triangles_from_edge_works_on_this_small_example() {
     use zo::{XY, X, Y};
 
     let mut triangles = Triangles::with_capacity(5);
 
-    push_floor_triangles_from_path(
+    push_floor_triangles_from_edge(
         &mut triangles,
         &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.55, 0.45)]
     );
@@ -484,12 +487,12 @@ fn push_floor_triangles_from_path_works_on_this_small_example() {
 }
 
 #[test]
-fn push_floor_triangles_from_path_works_on_the_initial_example() {
+fn push_floor_triangles_from_edge_works_on_the_initial_example() {
     use zo::{XY, X, Y};
 
     let mut triangles = Triangles::with_capacity(5);
 
-    push_floor_triangles_from_path(
+    push_floor_triangles_from_edge(
         &mut triangles,
         &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.55, 0.45), zo_xy!(1., 0.)]
     );
@@ -504,6 +507,73 @@ fn push_floor_triangles_from_path_works_on_the_initial_example() {
             zo_xy!(1., 0.),
         ]
     );
+}
+
+fn push_spiky_edge_points(
+    edge: &mut Edge,
+    rng: &mut Xs,
+    Range { start, end }: Range<zo::XY>,
+    count: usize
+) {
+    if count == 0 {
+        return;
+    }
+
+    let mut x_base = start.x.0;
+    let mut y_base = start.y.0;
+
+    edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+
+    if count == 1 {
+        return;
+    }
+
+    let (min_x, max_x) = if start.x.0 < end.x.0 {
+        (start.x.0, end.x.0)
+    } else {
+        // NaN ends up here.
+        (end.x.0, start.x.0)
+    };
+
+    let (min_y, max_y) = if start.y.0 < end.y.0 {
+        (start.y.0, end.y.0)
+    } else {
+        // NaN ends up here.
+        (end.y.0, start.y.0)
+    };
+
+    let x_delta = (end.x.0 - start.x.0) / count as f32;
+    let y_delta = (end.y.0 - start.y.0) / count as f32;
+
+    x_base += x_delta;
+    y_base += y_delta;
+
+    const SCALE: u32 = 65536;
+
+    macro_rules! minus_one_to_one {
+        () => {
+            (xs_range(rng, 0..SCALE * 2) as f32 / SCALE as f32) - 1.
+        }
+    }
+
+    // `y` can be spikier.
+    const Y_SPIKE_FACTOR: f32 = 8.;
+
+    for _ in 1..count {
+        let mut x = x_base + x_delta * minus_one_to_one!();
+        let mut y = y_base + y_delta * Y_SPIKE_FACTOR * minus_one_to_one!();
+
+        if x < min_x { x = min_x; }
+        if y < min_y { y = min_y; }
+
+        if x > max_x { x = max_x; }
+        if y > max_y { y = max_y; }
+
+        edge.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
+
+        x_base += x_delta;
+        y_base += y_delta;
+    }
 }
 
 #[derive(Debug, Default)]
@@ -534,54 +604,60 @@ impl Board {
             triangles.push(zo_xy!(1., 0.));
         }
 
-        let path_count = (triangle_count / 2) + 1;
+        let edge_count = (triangle_count / 2) + 1;
 
-        let x_delta = 1. / path_count as f32;
-        // We want some leftover y space
-        let y_delta = x_delta * 0.75;
+        let mut edge = Vec::with_capacity(edge_count as usize);
 
-        let mut path = Vec::with_capacity(path_count as usize);
+        let supposed_summit = zo_xy!(
+            0.5,
+            0.625,
+        );
 
-        let mut x_base = 0.;
-        let mut y_base = 0.;
+        assert!(edge_count >= 2);
+        let per_slope = edge_count / 2;
 
-        assert!(path_count >= 1);
-        path.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+        dbg!(per_slope);
 
-        x_base += x_delta;
-        y_base += y_delta;
+        push_spiky_edge_points(
+            &mut edge,
+            &mut rng,
+            zo_xy!(0., 0.)..supposed_summit,
+            per_slope,
+        );
 
-        const SCALE: u32 = 65536;
+        let mut max_x = 0.;
+        let mut max_y = 0.;
 
-        macro_rules! rf32 {
-            () => {
-                xs_range(&mut rng, 0..SCALE) as f32 / SCALE as f32
+        for xy in &edge {
+            let x = xy.x.0;
+            let y = xy.y.0;
+
+            if x > max_x {
+                max_x = x;
+            }
+            if y > max_y {
+                max_y = y;
             }
         }
 
-        // `y` can be spikier.
-        const Y_SPIKE_FACTOR: f32 = 16.;
-
-        for i in 1..path_count - 1 {
-            let x = x_base + (x_delta / 2.) * rf32!();
-            let y = y_base + y_delta * Y_SPIKE_FACTOR * rf32!();
-
-            path.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
-
-            x_base += x_delta;
-            y_base += y_delta;
-        }
-
-        assert!(path_count >= 2);
-        path.push(zo::XY{
-            x: zo::X(1.),
+        let summit = zo_xy!(
+            max_x,
             // The summit must be the highest point
-            y: zo::Y(y_base + y_delta * (Y_SPIKE_FACTOR + 1.))
-        });
+            max_y + 0.0015,
+        );
 
-        // TODO Generate down slope too. Make a function that generate n path
-        // points upward, and another that genrerates n path points downward?
-        // Then we can link them together, and later swap in new functions.
+        push_spiky_edge_points(
+            &mut edge,
+            &mut rng,
+            summit..zo_xy!(1., 0.),
+            per_slope,
+        );
+        edge.push(zo_xy!(1., 0.));
+
+        // TODO Draw a little flag at the summit, so we can see if it is the highest 
+        // point.
+
+        // TODO consider fixing up the summit after the second half is generated.
 
         // TODO make a function that deterministically produces the simplest
         // overhang.
@@ -591,11 +667,13 @@ impl Board {
 
         // TODO make a function that deterministically produces a spiral overhang.
 
-        dbg!(&path);
+        dbg!(&edge);
 
-        push_floor_triangles_from_path(
+        assert_eq!(edge.len(), edge_count);
+
+        push_floor_triangles_from_edge(
             &mut triangles,
-            &path
+            &edge
         );
 
         Self {
