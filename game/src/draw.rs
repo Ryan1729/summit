@@ -161,10 +161,17 @@ impl Default for SpriteKind {
 pub type TriangleStrip = Vec<DrawXY>;
 
 #[derive(Debug)]
+pub enum Colour {
+    Stone,
+    Pole,
+    Flag,
+}
+
+#[derive(Debug)]
 pub enum Command {
     Sprite(SpriteSpec),
     Text(TextSpec),
-    TriangleStrip(TriangleStrip)
+    TriangleStrip(TriangleStrip, Colour)
 }
 
 #[derive(Debug)]

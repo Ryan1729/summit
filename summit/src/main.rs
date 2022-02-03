@@ -231,6 +231,8 @@ mod raylib_rs_platform {
         const BACKGROUND: Color = Color{ r: 0x22, g: 0x22, b: 0x22, a: 255 };
         const WHITE: Color = Color{ r: 0xee, g: 0xee, b: 0xee, a: 255 };
         const STONE: Color = Color{ r: 0x5a, g: 0x7d, b: 0x8b, a: 255 };
+        const POLE: Color = Color{ r: 0x33, g: 0x52, b: 0xe1, a: 255 };
+        const FLAG: Color = Color{ r: 0xde, g: 0x49, b: 0x49, a: 255 };
         const TEXT: Color = WHITE;
         const NO_TINT: Color = WHITE;
         const OUTLINE: Color = WHITE;
@@ -444,15 +446,20 @@ mod raylib_rs_platform {
                                 },
                             };
                         },
-                        TriangleStrip(strip) => {
+                        TriangleStrip(strip, colour) => {
                             let vectors: Vec<_> = strip
                                 .iter()
                                 .map(|DrawXY{x, y}| Vector2{x: *x, y: *y})
                                 .collect();
 
+                            use game::draw::Colour::*;
                             shader_d.draw_triangle_strip(
                                 &vectors,
-                                STONE
+                                match colour {
+                                    Stone => STONE,
+                                    Pole => POLE,
+                                    Flag => FLAG,
+                                }
                             );
                         }
                     }

@@ -115,7 +115,7 @@ pub mod draw;
 pub use draw::{
     DrawLength,
     DrawX,
-    DrawY, 
+    DrawY,
     DrawXY,
     DrawW,
     DrawH,
@@ -150,7 +150,7 @@ macro_rules! from_rng_enum_def {
             pub const ALL: [Self; Self::COUNT] = [
                 $(Self::$variants,)+
             ];
-        
+
             pub fn from_rng(rng: &mut Xs) -> Self {
                 Self::ALL[xs_u32(rng, 0, Self::ALL.len() as u32) as usize]
             }
@@ -297,7 +297,7 @@ mod tile {
                 (index % X::COUNT as usize) as Count
             )),
             y: Y(to_coord_or_default(
-                ((index % (XY::COUNT as usize) as usize) 
+                ((index % (XY::COUNT as usize) as usize)
                 / X::COUNT as usize) as Count
             )),
         }
@@ -315,7 +315,7 @@ fn draw_xy_from_tile(sizes: &Sizes, txy: tile::XY) -> DrawXY {
     }
 }
 
-/// A Tile should always be at a particular position, but that position should be 
+/// A Tile should always be at a particular position, but that position should be
 /// derivable from the tiles location in the tiles array, so it doesn't need to be
 /// stored. But, we often want to get the tile's data and it's location as a single
 /// thing. This is why we have both `Tile` and `TileData`
@@ -581,6 +581,7 @@ struct Board {
     tiles: Tiles,
     eye: Eye,
     triangles: Triangles,
+    summit: zo::XY,
 }
 
 impl Board {
@@ -654,15 +655,12 @@ impl Board {
         );
         edge.push(zo_xy!(1., 0.));
 
-        // TODO Draw a little flag at the summit, so we can see if it is the highest 
-        // point.
-
         // TODO consider fixing up the summit after the second half is generated.
 
         // TODO make a function that deterministically produces the simplest
         // overhang.
 
-        // TODO make a function that generates the a random variation on the 
+        // TODO make a function that generates the a random variation on the
         // simplest overhang.
 
         // TODO make a function that deterministically produces a spiral overhang.
@@ -683,6 +681,7 @@ impl Board {
                 ..<_>::default()
             },
             triangles,
+            summit,
         }
     }
 }
@@ -882,18 +881,60 @@ pub fn update(
         xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
     }));
 
-    let strip: draw::TriangleStrip = state.board.triangles
-        .iter()
-        .map(|tri| {
-            DrawXY {
-                x: state.sizes.board_xywh.x + state.sizes.board_xywh.w * tri.x.0,
-                y: state.sizes.board_xywh.y + state.sizes.board_xywh.h * (TOP_Y - tri.y.0),
-            }
-        })
-        .collect();
-    
+    fn zo_to_draw_xy(sizes: &Sizes, xy: zo::XY) -> DrawXY {
+        DrawXY {
+            x: sizes.board_xywh.x + sizes.board_xywh.w * xy.x.0,
+            y: sizes.board_xywh.y + sizes.board_xywh.h * (TOP_Y - xy.y.0),
+        }
+    }
 
-    commands.push(TriangleStrip(strip));
+    // TODO avoid this per-frame allocation or merge it with others.
+    let mountain: draw::TriangleStrip = state.board.triangles
+        .iter()
+        .map(|xy| zo_to_draw_xy(&state.sizes, *xy))
+        .collect();
+
+    commands.push(TriangleStrip(mountain, draw::Colour::Stone));
+
+    let summit_xy = state.board.summit;
+
+    const POLE_HALF_W: f32 = 1./1024.;
+    const POLE_H: f32 = POLE_HALF_W * 32.;//8.;
+
+    let pole_top_y = summit_xy.y.0 + POLE_H;
+    let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
+    let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
+
+    use zo::{X, Y, XY};
+
+    // TODO avoid this per-frame allocation or merge it with others.
+    let pole = vec![
+        zo_xy!{ pole_min_x, summit_xy.y.0 },
+        zo_xy!{ pole_max_x, summit_xy.y.0 },
+        zo_xy!{ pole_min_x, pole_top_y },
+        zo_xy!{ pole_max_x, pole_top_y },
+    ]
+        .into_iter()
+        .map(|xy| zo_to_draw_xy(&state.sizes, xy))
+        .collect();
+
+    commands.push(TriangleStrip(pole, draw::Colour::Pole));
+
+    const FLAG_H: f32 = POLE_H / 4.;
+    const FLAG_W: f32 = FLAG_H;
+
+    // TODO Animate the flag blowing in the wind.
+
+    let flag = vec![
+        zo_xy!{ pole_max_x, pole_top_y },
+        zo_xy!{ pole_max_x, pole_top_y - FLAG_H },
+        zo_xy!{ pole_max_x + FLAG_W, pole_top_y - FLAG_H / 2. },
+    ]
+        .into_iter()
+        .map(|xy| zo_to_draw_xy(&state.sizes, xy))
+        .collect();
+
+    commands.push(TriangleStrip(flag, draw::Colour::Flag));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
