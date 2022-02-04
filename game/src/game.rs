@@ -448,11 +448,20 @@ type Edge = Vec<zo::XY>;
 pub const TOP_Y: f32 = 1.0;
 pub const BOTTOM_Y: f32 = 0.0;
 
+fn push_with_floor_point(
+    triangles: &mut Triangles,
+    xy: zo::XY,
+) {
+    use zo::{XY, X, Y};
+
+    triangles.push(zo_xy!(xy.x.0, BOTTOM_Y));
+    triangles.push(xy);
+}
+
 fn push_floor_triangles_from_edge(
     triangles: &mut Triangles,
     edge: &[zo::XY],
 ) {
-    use zo::{XY, X, Y};
     if edge.is_empty() {
         return;
     }
@@ -460,8 +469,7 @@ fn push_floor_triangles_from_edge(
     triangles.push(edge[0]);
 
     for &xy in &edge[1..] {
-        triangles.push(zo_xy!(xy.x.0, BOTTOM_Y));
-        triangles.push(xy);
+        push_with_floor_point(triangles, xy);
     }
 }
 
@@ -576,6 +584,105 @@ fn push_spiky_edge_points(
     }
 }
 
+fn push_evenly_spaced_edge_points(
+    edge: &mut Edge,
+    Range { start, end }: Range<zo::XY>,
+    count: usize
+) {
+    if count == 0 {
+        return;
+    }
+
+    let mut x_base = start.x.0;
+    let mut y_base = start.y.0;
+
+    edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+
+    if count == 1 {
+        return;
+    }
+
+    let max_x = if start.x.0 < end.x.0 {
+        end.x.0
+    } else {
+        // NaN ends up here.
+        start.x.0
+    };
+
+    let max_y = if start.y.0 < end.y.0 {
+        end.y.0
+    } else {
+        // NaN ends up here.
+        start.y.0
+    };
+
+    let x_delta = (end.x.0 - start.x.0) / count as f32;
+    let y_delta = (end.y.0 - start.y.0) / count as f32;
+
+    x_base += x_delta;
+    y_base += y_delta;
+
+    for _ in 1..count {
+        let mut x = x_base + x_delta;
+        let mut y = y_base + y_delta;
+
+        if x > max_x { x = max_x; }
+        if y > max_y { y = max_y; }
+
+        edge.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
+
+        x_base += x_delta;
+        y_base += y_delta;
+    }
+}
+
+fn push_simplest_overhang_edge_points(
+    edge: &mut Edge,
+    Range { start, end }: Range<zo::XY>,
+    count: usize
+) {
+    if count == 0 {
+        return;
+    }
+
+    let mut x_base = start.x.0;
+    let mut y_base = start.y.0;
+
+    let start_len = edge.len();
+
+    edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+
+    if count == 1 {
+        return;
+    }
+
+    // TODO refactor to pass around triangles vec instead, so we can get a real
+    // overhang
+
+    if count > 4 {
+        let x_delta = (end.x.0 - start.x.0) / count as f32;
+        let y_delta = (end.y.0 - start.y.0) / count as f32;
+
+        x_base += x_delta;
+        y_base += y_delta;
+
+        edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
+        edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+
+        x_base += x_delta;
+        y_base += y_delta;
+
+        edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
+        edge.push(zo::XY{ x: zo::X(x_base - x_delta * 2.), y: zo::Y(y_base) });
+    }
+
+    push_evenly_spaced_edge_points(
+        edge,
+        zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) }..end,
+        count - (edge.len() - start_len),
+    )
+}
+
 #[derive(Debug, Default)]
 struct Board {
     tiles: Tiles,
@@ -586,8 +693,6 @@ struct Board {
 
 impl Board {
     fn from_seed(seed: Seed) -> Self {
-        #![allow(unused)] // TODO remove
-
         let mut rng = xs_from_seed(seed);
 
         let tiles = Tiles::from_rng(&mut rng);
@@ -619,9 +724,15 @@ impl Board {
 
         dbg!(per_slope);
 
-        push_spiky_edge_points(
+        /*push_spiky_edge_points(
             &mut edge,
             &mut rng,
+            zo_xy!(0., 0.)..supposed_summit,
+            per_slope,
+        );*/
+
+        push_simplest_overhang_edge_points(
+            &mut edge,
             zo_xy!(0., 0.)..supposed_summit,
             per_slope,
         );
