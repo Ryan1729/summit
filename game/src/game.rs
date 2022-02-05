@@ -643,7 +643,7 @@ impl Board {
 
         let tiles = Tiles::from_rng(&mut rng);
 
-        let triangle_count = 128;
+        let triangle_count = 254;
         let overall_count = 2 + triangle_count;
 
         let mut triangles = Vec::with_capacity(overall_count as usize);
