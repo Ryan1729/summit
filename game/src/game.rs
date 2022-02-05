@@ -579,9 +579,13 @@ fn push_simplest_overhang_triangles(
     Range { start, end }: Range<zo::XY>,
     count: usize
 ) {
-    if count == 0 {
-        return;
+    let mut remaining_count = count;
+
+    macro_rules! early_out {
+        () => { if remaining_count == 0 { return; } }
     }
+
+    early_out!();
 
     let mut x_base = start.x.0;
     let mut y_base = start.y.0;
@@ -590,14 +594,11 @@ fn push_simplest_overhang_triangles(
 
     triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
 
-    if count == 1 {
-        return;
-    }
+    remaining_count -= 1;
 
-    // TODO refactor to pass around triangles vec instead, so we can get a real
-    // overhang
+    early_out!();
 
-    if count > 4 {
+    while remaining_count >= 4 {
         let x_delta = (end.x.0 - start.x.0) / count as f32;
         let y_delta = (end.y.0 - start.y.0) / count as f32;
 
@@ -612,7 +613,11 @@ fn push_simplest_overhang_triangles(
 
         triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
         triangles.push(zo::XY{ x: zo::X(x_base - x_delta * 2.), y: zo::Y(y_base) });
+
+        remaining_count -= 4;
     }
+
+    early_out!();
 
     push_evenly_spaced_triangles(
         triangles,
@@ -703,9 +708,6 @@ impl Board {
         triangles.push(final_point);
 
         // TODO consider fixing up the summit after the second half is generated.
-
-        // TODO make a function that deterministically produces the simplest
-        // overhang.
 
         // TODO make a function that generates the a random variation on the
         // simplest overhang.
