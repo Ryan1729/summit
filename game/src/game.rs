@@ -598,10 +598,13 @@ fn push_simplest_overhang_triangles(
 
     early_out!();
 
-    while remaining_count >= 4 {
-        let x_delta = (end.x.0 - start.x.0) / count as f32;
-        let y_delta = (end.y.0 - start.y.0) / count as f32;
+    const PER_OVERHANG: usize = 4;
+    const POINTS_PER_DELTA: f32 = 2.;
 
+    let x_delta = (end.x.0 - start.x.0) / (count as f32 / POINTS_PER_DELTA);
+    let y_delta = (end.y.0 - start.y.0) / (count as f32 / POINTS_PER_DELTA);
+
+    while remaining_count >= PER_OVERHANG {
         x_base += x_delta;
         y_base += y_delta;
 
@@ -614,7 +617,7 @@ fn push_simplest_overhang_triangles(
         triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
         triangles.push(zo::XY{ x: zo::X(x_base - x_delta * 2.), y: zo::Y(y_base) });
 
-        remaining_count -= 4;
+        remaining_count -= PER_OVERHANG;
     }
 
     early_out!();
