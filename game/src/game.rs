@@ -430,11 +430,11 @@ mod zo {
     #[macro_export]
     macro_rules! zo_xy {
         ($x: expr, $y: expr $(,)?) => {
-            XY {
-                x: X(
+            zo::XY {
+                x: zo::X(
                     $x,
                 ),
-                y: Y(
+                y: zo::Y(
                     $y,
                 ),
             }
@@ -443,7 +443,6 @@ mod zo {
 }
 
 type Triangles = Vec<zo::XY>;
-type Edge = Vec<zo::XY>;
 
 pub const TOP_Y: f32 = 1.0;
 pub const BOTTOM_Y: f32 = 0.0;
@@ -452,73 +451,12 @@ fn push_with_floor_point(
     triangles: &mut Triangles,
     xy: zo::XY,
 ) {
-    use zo::{XY, X, Y};
-
     triangles.push(zo_xy!(xy.x.0, BOTTOM_Y));
     triangles.push(xy);
 }
 
-fn push_floor_triangles_from_edge(
+fn push_spiky_triangles_with_floor_points(
     triangles: &mut Triangles,
-    edge: &[zo::XY],
-) {
-    if edge.is_empty() {
-        return;
-    }
-
-    triangles.push(edge[0]);
-
-    for &xy in &edge[1..] {
-        push_with_floor_point(triangles, xy);
-    }
-}
-
-#[test]
-fn push_floor_triangles_from_edge_works_on_this_small_example() {
-    use zo::{XY, X, Y};
-
-    let mut triangles = Triangles::with_capacity(5);
-
-    push_floor_triangles_from_edge(
-        &mut triangles,
-        &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.55, 0.45)]
-    );
-
-    assert_eq!(
-        triangles,
-        vec![
-            zo_xy!(0., BOTTOM_Y),
-            zo_xy!(0.55, BOTTOM_Y),
-            zo_xy!(0.55, 0.45),
-        ]
-    );
-}
-
-#[test]
-fn push_floor_triangles_from_edge_works_on_the_initial_example() {
-    use zo::{XY, X, Y};
-
-    let mut triangles = Triangles::with_capacity(5);
-
-    push_floor_triangles_from_edge(
-        &mut triangles,
-        &[zo_xy!(0., BOTTOM_Y), zo_xy!(0.55, 0.45), zo_xy!(1., 0.)]
-    );
-
-    assert_eq!(
-        triangles,
-        vec![
-            zo_xy!(0., BOTTOM_Y),
-            zo_xy!(0.55, BOTTOM_Y),
-            zo_xy!(0.55, 0.45),
-            zo_xy!(1., BOTTOM_Y),
-            zo_xy!(1., 0.),
-        ]
-    );
-}
-
-fn push_spiky_edge_points(
-    edge: &mut Edge,
     rng: &mut Xs,
     Range { start, end }: Range<zo::XY>,
     count: usize
@@ -530,7 +468,7 @@ fn push_spiky_edge_points(
     let mut x_base = start.x.0;
     let mut y_base = start.y.0;
 
-    edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+    push_with_floor_point(triangles, zo_xy!{x_base, y_base});
 
     if count == 1 {
         return;
@@ -577,15 +515,15 @@ fn push_spiky_edge_points(
         if x > max_x { x = max_x; }
         if y > max_y { y = max_y; }
 
-        edge.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
+        push_with_floor_point(triangles, zo_xy!{x, y});
 
         x_base += x_delta;
         y_base += y_delta;
     }
 }
 
-fn push_evenly_spaced_edge_points(
-    edge: &mut Edge,
+fn push_evenly_spaced_triangles(
+    triangles: &mut Triangles,
     Range { start, end }: Range<zo::XY>,
     count: usize
 ) {
@@ -596,7 +534,7 @@ fn push_evenly_spaced_edge_points(
     let mut x_base = start.x.0;
     let mut y_base = start.y.0;
 
-    edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+    push_with_floor_point(triangles, zo_xy!{x_base, y_base});
 
     if count == 1 {
         return;
@@ -629,15 +567,15 @@ fn push_evenly_spaced_edge_points(
         if x > max_x { x = max_x; }
         if y > max_y { y = max_y; }
 
-        edge.push(zo::XY{ x: zo::X(x), y: zo::Y(y) });
+        push_with_floor_point(triangles, zo_xy!{x, y});
 
         x_base += x_delta;
         y_base += y_delta;
     }
 }
 
-fn push_simplest_overhang_edge_points(
-    edge: &mut Edge,
+fn push_simplest_overhang_triangles(
+    triangles: &mut Triangles,
     Range { start, end }: Range<zo::XY>,
     count: usize
 ) {
@@ -648,9 +586,9 @@ fn push_simplest_overhang_edge_points(
     let mut x_base = start.x.0;
     let mut y_base = start.y.0;
 
-    let start_len = edge.len();
+    let start_len = triangles.len();
 
-    edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+    triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
 
     if count == 1 {
         return;
@@ -666,20 +604,20 @@ fn push_simplest_overhang_edge_points(
         x_base += x_delta;
         y_base += y_delta;
 
-        edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
-        edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
+        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
 
         x_base += x_delta;
         y_base += y_delta;
 
-        edge.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
-        edge.push(zo::XY{ x: zo::X(x_base - x_delta * 2.), y: zo::Y(y_base) });
+        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
+        triangles.push(zo::XY{ x: zo::X(x_base - x_delta * 2.), y: zo::Y(y_base) });
     }
 
-    push_evenly_spaced_edge_points(
-        edge,
-        zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) }..end,
-        count - (edge.len() - start_len),
+    push_evenly_spaced_triangles(
+        triangles,
+        zo_xy!{x_base, y_base }..end,
+        count - (triangles.len() - start_len),
     )
 }
 
@@ -702,8 +640,6 @@ impl Board {
 
         let mut triangles = Vec::with_capacity(overall_count as usize);
 
-        use zo::{XY, X, Y};
-
         #[cfg(any())] {
             triangles.push(zo_xy!(0., 1.));
             triangles.push(zo_xy!(1., 1.));
@@ -711,8 +647,6 @@ impl Board {
         }
 
         let edge_count = (triangle_count / 2) + 1;
-
-        let mut edge = Vec::with_capacity(edge_count as usize);
 
         let supposed_summit = zo_xy!(
             0.5,
@@ -724,15 +658,15 @@ impl Board {
 
         dbg!(per_slope);
 
-        /*push_spiky_edge_points(
-            &mut edge,
+        /*push_spiky_triangles_with_floor_points(
+            &mut triangles,
             &mut rng,
             zo_xy!(0., 0.)..supposed_summit,
             per_slope,
         );*/
 
-        push_simplest_overhang_edge_points(
-            &mut edge,
+        push_simplest_overhang_triangles(
+            &mut triangles,
             zo_xy!(0., 0.)..supposed_summit,
             per_slope,
         );
@@ -740,7 +674,7 @@ impl Board {
         let mut max_x = 0.;
         let mut max_y = 0.;
 
-        for xy in &edge {
+        for xy in &triangles {
             let x = xy.x.0;
             let y = xy.y.0;
 
@@ -758,13 +692,15 @@ impl Board {
             max_y + 0.0015,
         );
 
-        push_spiky_edge_points(
-            &mut edge,
+        let final_point = zo_xy!(1., 0.);
+
+        push_spiky_triangles_with_floor_points(
+            &mut triangles,
             &mut rng,
-            summit..zo_xy!(1., 0.),
+            summit..final_point,
             per_slope,
         );
-        edge.push(zo_xy!(1., 0.));
+        triangles.push(final_point);
 
         // TODO consider fixing up the summit after the second half is generated.
 
@@ -775,15 +711,6 @@ impl Board {
         // simplest overhang.
 
         // TODO make a function that deterministically produces a spiral overhang.
-
-        dbg!(&edge);
-
-        assert_eq!(edge.len(), edge_count);
-
-        push_floor_triangles_from_edge(
-            &mut triangles,
-            &edge
-        );
 
         Self {
             tiles,
@@ -1015,8 +942,6 @@ pub fn update(
     let pole_top_y = summit_xy.y.0 + POLE_H;
     let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
     let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
-
-    use zo::{X, Y, XY};
 
     // TODO avoid this per-frame allocation or merge it with others.
     let pole = vec![
