@@ -47,6 +47,18 @@ fn xs_range(xs: &mut Xs, range: Range<u32>) -> u32 {
     xs_u32(xs, range.start, range.end)
 }
 
+const XS_SCALE: u32 = 1 << f32::MANTISSA_DIGITS;
+
+#[allow(unused)]
+fn xs_zero_to_one(xs: &mut Xs) -> f32 {
+    (xs_u32(xs, 0, XS_SCALE + 1) as f32 / XS_SCALE as f32) - 1.
+}
+
+#[allow(unused)]
+fn xs_minus_one_to_one(xs: &mut Xs) -> f32 {
+    (xs_u32(xs, 0, (XS_SCALE * 2) + 1) as f32 / XS_SCALE as f32) - 1.
+}
+
 #[allow(unused)]
 fn xs_shuffle<A>(rng: &mut Xs, slice: &mut [A]) {
     for i in 1..slice.len() as u32 {
@@ -415,10 +427,10 @@ mod zo {
     /// clipped later.
     pub type Zo = f32;
 
-    #[derive(Copy, Clone, Debug, Default, PartialEq)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
     pub struct X(pub(crate) Zo);
 
-    #[derive(Copy, Clone, Debug, Default, PartialEq)]
+    #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
     pub struct Y(pub(crate) Zo);
 
     #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -439,6 +451,42 @@ mod zo {
                 ),
             }
         }
+    }
+
+    pub fn minimums((a, b): (XY, XY)) -> (X, Y) {
+        let min_x = if a.x < b.x {
+            a.x
+        } else {
+            // NaN ends up here.
+            b.x
+        };
+
+        let min_y = if a.y < b.y {
+            a.y
+        } else {
+            // NaN ends up here.
+            b.y
+        };
+
+        (min_x, min_y)
+    }
+
+    pub fn maximums((a, b): (XY, XY)) -> (X, Y) {
+        let max_x = if a.x < b.x {
+            b.x
+        } else {
+            // NaN ends up here.
+            a.x
+        };
+
+        let max_y = if a.y < b.y {
+            b.y
+        } else {
+            // NaN ends up here.
+            a.y
+        };
+
+        (max_x, max_y)
     }
 }
 
@@ -474,19 +522,10 @@ fn push_spiky_triangles_with_floor_points(
         return;
     }
 
-    let (min_x, max_x) = if start.x.0 < end.x.0 {
-        (start.x.0, end.x.0)
-    } else {
-        // NaN ends up here.
-        (end.x.0, start.x.0)
-    };
-
-    let (min_y, max_y) = if start.y.0 < end.y.0 {
-        (start.y.0, end.y.0)
-    } else {
-        // NaN ends up here.
-        (end.y.0, start.y.0)
-    };
+    let (min_x, min_y) = zo::minimums((start, end));
+    let (min_x, min_y) = (min_x.0, min_y.0);
+    let (max_x, max_y) = zo::maximums((start, end));
+    let (max_x, max_y) = (max_x.0, max_y.0);
 
     let x_delta = (end.x.0 - start.x.0) / count as f32;
     let y_delta = (end.y.0 - start.y.0) / count as f32;
@@ -494,20 +533,12 @@ fn push_spiky_triangles_with_floor_points(
     x_base += x_delta;
     y_base += y_delta;
 
-    const SCALE: u32 = 65536;
-
-    macro_rules! minus_one_to_one {
-        () => {
-            (xs_range(rng, 0..SCALE * 2) as f32 / SCALE as f32) - 1.
-        }
-    }
-
     // `y` can be spikier.
     const Y_SPIKE_FACTOR: f32 = 8.;
 
     for _ in 1..count {
-        let mut x = x_base + x_delta * minus_one_to_one!();
-        let mut y = y_base + y_delta * Y_SPIKE_FACTOR * minus_one_to_one!();
+        let mut x = x_base + x_delta * xs_minus_one_to_one(rng);
+        let mut y = y_base + y_delta * Y_SPIKE_FACTOR * xs_minus_one_to_one(rng);
 
         if x < min_x { x = min_x; }
         if y < min_y { y = min_y; }
@@ -540,19 +571,8 @@ fn push_evenly_spaced_triangles(
         return;
     }
 
-    let max_x = if start.x.0 < end.x.0 {
-        end.x.0
-    } else {
-        // NaN ends up here.
-        start.x.0
-    };
-
-    let max_y = if start.y.0 < end.y.0 {
-        end.y.0
-    } else {
-        // NaN ends up here.
-        start.y.0
-    };
+    let (max_x, max_y) = zo::maximums((start, end));
+    let (max_x, max_y) = (max_x.0, max_y.0);
 
     let x_delta = (end.x.0 - start.x.0) / count as f32;
     let y_delta = (end.y.0 - start.y.0) / count as f32;
@@ -574,8 +594,9 @@ fn push_evenly_spaced_triangles(
     }
 }
 
-fn push_simplest_overhang_triangles(
+fn push_overhang_triangles(
     triangles: &mut Triangles,
+    rng: &mut Xs,
     Range { start, end }: Range<zo::XY>,
     count: usize
 ) {
@@ -598,6 +619,11 @@ fn push_simplest_overhang_triangles(
 
     early_out!();
 
+    let (min_x, min_y) = zo::minimums((start, end));
+    let (min_x, min_y) = (min_x.0, min_y.0);
+    let (max_x, max_y) = zo::maximums((start, end));
+    let (max_x, max_y) = (max_x.0, max_y.0);
+
     const PER_OVERHANG: usize = 4;
     const POINTS_PER_DELTA: f32 = 2.;
 
@@ -605,17 +631,39 @@ fn push_simplest_overhang_triangles(
     let y_delta = (end.y.0 - start.y.0) / (count as f32 / POINTS_PER_DELTA);
 
     while remaining_count >= PER_OVERHANG {
+        macro_rules! gen_xy {
+            () => {{
+                let mut x = x_base + x_delta * xs_minus_one_to_one(rng);
+                let mut y = y_base + y_delta * xs_minus_one_to_one(rng);
+
+                if x < min_x { x = min_x; }
+                if y < min_y { y = min_y; }
+
+                if x > max_x { x = max_x; }
+                if y > max_y { y = max_y; }
+
+                (x, y)
+            }}
+        }
+
         x_base += x_delta;
         y_base += y_delta;
 
-        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
-        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+        let (x, y) = gen_xy!();
+
+        push_with_floor_point(triangles, zo_xy!{x, y});
 
         x_base += x_delta;
         y_base += y_delta;
 
-        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(BOTTOM_Y) });
-        triangles.push(zo::XY{ x: zo::X(x_base - x_delta * 2.), y: zo::Y(y_base) });
+        let (x, y) = gen_xy!();
+
+        // This is similar, but not identical to, an inlined version of
+        // the `push_with_floor_point` procedure.
+        triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(BOTTOM_Y) });
+        let mut overhang_x = x - x_delta * 2.;
+        if overhang_x < min_x { overhang_x = min_x; }
+        triangles.push(zo::XY{ x: zo::X(overhang_x), y: zo::Y(y) });
 
         remaining_count -= PER_OVERHANG;
     }
@@ -624,7 +672,7 @@ fn push_simplest_overhang_triangles(
 
     push_evenly_spaced_triangles(
         triangles,
-        zo_xy!{x_base, y_base }..end,
+        zo_xy!{ x_base, y_base }..end,
         count - (triangles.len() - start_len),
     )
 }
@@ -673,8 +721,9 @@ impl Board {
             per_slope,
         );*/
 
-        push_simplest_overhang_triangles(
+        push_overhang_triangles(
             &mut triangles,
+            &mut rng,
             zo_xy!(0., 0.)..supposed_summit,
             per_slope,
         );
