@@ -810,36 +810,32 @@ impl Board {
             per_slope,
         );
 
-        let mut max_x = 0.;
-        let mut max_y = 0.;
-
-        for xy in &triangles {
-            let x = xy.x.0;
-            let y = xy.y.0;
-
-            if x > max_x {
-                max_x = x;
-            }
-            if y > max_y {
-                max_y = y;
-            }
-        }
-
-        let summit = zo_xy!(
-            max_x,
-            // The summit must be the highest point
-            max_y + 0.0015,
-        );
-
         random_sections_across(
             &mut triangles,
             &mut rng,
-            summit..FINAL_POINT,
+            supposed_summit..FINAL_POINT,
             per_slope,
         );
         triangles.push(FINAL_POINT);
 
-        // TODO consider fixing up the summit after the second half is generated.
+        let mut max_y = 0.;
+        let mut summit_index = 0;
+
+        for (i, xy) in triangles.iter().enumerate() {
+            let y = xy.y.0;
+
+            if y > max_y {
+                max_y = y;
+                summit_index = i;
+            }
+        }
+
+        let mut summit = triangles[summit_index];
+
+        // The summit must be the highest point
+        summit.y.0 = max_y + 0.0015;
+
+        triangles[summit_index] = summit;
 
         Self {
             tiles,
