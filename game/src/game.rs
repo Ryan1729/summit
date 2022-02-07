@@ -503,6 +503,13 @@ fn push_with_floor_point(
     triangles.push(xy);
 }
 
+type MountainSection = fn (
+    triangles: &mut Triangles,
+    rng: &mut Xs,
+    range: Range<zo::XY>,
+    count: usize
+);
+
 fn push_spiky_triangles_with_floor_points(
     triangles: &mut Triangles,
     rng: &mut Xs,
@@ -516,10 +523,12 @@ fn push_spiky_triangles_with_floor_points(
     let mut x_base = start.x.0;
     let mut y_base = start.y.0;
 
-    push_with_floor_point(triangles, zo_xy!{x_base, y_base});
+    if triangles.is_empty() {
+        triangles.push(zo_xy!{x_base, y_base});
 
-    if count == 1 {
-        return;
+        if count == 1 {
+            return;
+        }
     }
 
     let (min_x, min_y) = zo::minimums((start, end));
@@ -565,10 +574,12 @@ fn push_evenly_spaced_triangles(
     let mut x_base = start.x.0;
     let mut y_base = start.y.0;
 
-    push_with_floor_point(triangles, zo_xy!{x_base, y_base});
+    if triangles.is_empty() {
+        triangles.push(zo_xy!{x_base, y_base});
 
-    if count == 1 {
-        return;
+        if count == 1 {
+            return;
+        }
     }
 
     let (max_x, max_y) = zo::maximums((start, end));
@@ -594,6 +605,15 @@ fn push_evenly_spaced_triangles(
     }
 }
 
+fn push_evenly_spaced_triangles_section(
+    triangles: &mut Triangles,
+    _: &mut Xs,
+    range: Range<zo::XY>,
+    count: usize,
+) {
+    push_evenly_spaced_triangles(triangles, range, count)
+}
+
 fn push_overhang_triangles(
     triangles: &mut Triangles,
     rng: &mut Xs,
@@ -613,11 +633,13 @@ fn push_overhang_triangles(
 
     let start_len = triangles.len();
 
-    triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+    if start_len == 0 {
+        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
 
-    remaining_count -= 1;
+        remaining_count -= 1;
 
-    early_out!();
+        early_out!();
+    }
 
     let (min_x, min_y) = zo::minimums((start, end));
     let (min_x, min_y) = (min_x.0, min_y.0);
@@ -712,19 +734,79 @@ impl Board {
         assert!(edge_count >= 2);
         let per_slope = edge_count / 2;
 
-        dbg!(per_slope);
+        const SECTIONS: [MountainSection; 4] = [
+            push_evenly_spaced_triangles_section,
+            push_spiky_triangles_with_floor_points,
+            push_overhang_triangles,
 
-        /*push_spiky_triangles_with_floor_points(
+            // TODO make a function that deterministically produces a spiral overhang.
+
+            // TODO does including this in here make a meaningful differnce?
+            random_sections_across,
+        ];
+
+        const INITIAL_POINT: zo::XY = zo_xy!(0., 0.);
+        const FINAL_POINT: zo::XY = zo_xy!(1., 0.);
+
+        fn random_sections_across(
+            triangles: &mut Triangles,
+            rng: &mut Xs,
+            Range { start, end }: Range<zo::XY>,
+            count: usize,
+        ) {
+            let (min_x, min_y) = zo::minimums((start, end));
+            let (min_x, min_y) = (min_x.0, min_y.0);
+
+            let (max_x, max_y) = zo::maximums((start, end));
+            let (max_x, max_y) = (max_x.0, max_y.0);
+
+            let x_delta = (end.x.0 - start.x.0) / count as f32;
+            let y_delta = (end.y.0 - start.y.0) / count as f32;
+
+            let mut previous_end_point = start;
+
+            let mut remaining = count;
+            loop {
+                let mut count_for_this_section = xs_range(rng, 0..8) as usize;
+
+                if remaining < count_for_this_section {
+                    count_for_this_section = remaining;
+                }
+
+                remaining -= count_for_this_section;
+
+                compile_time_assert!(SECTIONS.len() <= u32::MAX as usize);
+
+                let section = SECTIONS[xs_range(rng, 0..SECTIONS.len() as u32) as usize];
+
+                let mut x = previous_end_point.x.0 + x_delta * count_for_this_section as f32;
+                let mut y = previous_end_point.y.0 + y_delta * count_for_this_section as f32;
+
+                if x < min_x { x = min_x; }
+                if y < min_y { y = min_y; }
+
+                if x > max_x { x = max_x; }
+                if y > max_y { y = max_y; }
+
+                let next_point = zo_xy!(x, y);
+
+                section(
+                    triangles,
+                    rng,
+                    previous_end_point..next_point,
+                    count_for_this_section
+                );
+
+                if remaining == 0 { break }
+
+                previous_end_point = next_point;
+            }
+        }
+
+        random_sections_across(
             &mut triangles,
             &mut rng,
-            zo_xy!(0., 0.)..supposed_summit,
-            per_slope,
-        );*/
-
-        push_overhang_triangles(
-            &mut triangles,
-            &mut rng,
-            zo_xy!(0., 0.)..supposed_summit,
+            INITIAL_POINT..supposed_summit,
             per_slope,
         );
 
@@ -749,22 +831,15 @@ impl Board {
             max_y + 0.0015,
         );
 
-        let final_point = zo_xy!(1., 0.);
-
-        push_spiky_triangles_with_floor_points(
+        random_sections_across(
             &mut triangles,
             &mut rng,
-            summit..final_point,
+            summit..FINAL_POINT,
             per_slope,
         );
-        triangles.push(final_point);
+        triangles.push(FINAL_POINT);
 
         // TODO consider fixing up the summit after the second half is generated.
-
-        // TODO make a function that generates the a random variation on the
-        // simplest overhang.
-
-        // TODO make a function that deterministically produces a spiral overhang.
 
         Self {
             tiles,
