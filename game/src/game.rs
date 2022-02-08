@@ -705,6 +705,7 @@ struct Board {
     eye: Eye,
     triangles: Triangles,
     summit: zo::XY,
+    player_xy: zo::XY,
 }
 
 impl Board {
@@ -845,6 +846,7 @@ impl Board {
             },
             triangles,
             summit,
+            player_xy: <_>::default(),
         }
     }
 }
@@ -1068,16 +1070,24 @@ pub fn update(
     let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
     let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
 
+    macro_rules! declare_strip {
+        ($($xys: expr),* $(,)?) => {{
+            vec![
+                $($xys),*
+            ]
+                .into_iter()
+                .map(|xy| zo_to_draw_xy(&state.sizes, xy))
+                .collect()
+        }}
+    }
+
     // TODO avoid this per-frame allocation or merge it with others.
-    let pole = vec![
+    let pole = declare_strip![
         zo_xy!{ pole_min_x, summit_xy.y.0 },
         zo_xy!{ pole_max_x, summit_xy.y.0 },
         zo_xy!{ pole_min_x, pole_top_y },
         zo_xy!{ pole_max_x, pole_top_y },
-    ]
-        .into_iter()
-        .map(|xy| zo_to_draw_xy(&state.sizes, xy))
-        .collect();
+    ];
 
     commands.push(TriangleStrip(pole, draw::Colour::Pole));
 
@@ -1086,16 +1096,59 @@ pub fn update(
 
     // TODO Animate the flag blowing in the wind.
 
-    let flag = vec![
+    let flag = declare_strip![
         zo_xy!{ pole_max_x, pole_top_y },
         zo_xy!{ pole_max_x, pole_top_y - FLAG_H },
         zo_xy!{ pole_max_x + FLAG_W, pole_top_y - FLAG_H / 2. },
-    ]
-        .into_iter()
-        .map(|xy| zo_to_draw_xy(&state.sizes, xy))
-        .collect();
+    ];
 
     commands.push(TriangleStrip(flag, draw::Colour::Flag));
+
+    let player = {
+        let xy = state.board.player_xy;
+        let x = xy.x.0;
+        let y = xy.y.0;
+
+        const LEG_WIDTH: f32 = 1./64.;//1024.;
+        const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
+        const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
+
+        let left_leg_min_x = x - (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
+        let left_leg_max_x = x - (BETWEEN_LEGS_HALF_WIDTH);
+
+        let right_leg_min_x = x + (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
+        let right_leg_max_x = x + (BETWEEN_LEGS_HALF_WIDTH);
+
+        let leg_max_y = y + LEG_HEIGHT;
+
+        declare_strip![
+            // Left leg
+            zo_xy!{left_leg_min_x, y},
+            zo_xy!{left_leg_max_x, y},
+            zo_xy!{left_leg_min_x, leg_max_y},
+            zo_xy!{left_leg_max_x, leg_max_y},
+            // Degenerate triangles
+            //   Last tri but degenerate
+            zo_xy!{left_leg_min_x, leg_max_y},
+            zo_xy!{left_leg_max_x, leg_max_y},
+            zo_xy!{left_leg_max_x, leg_max_y},
+            //   Make the jump we want to make
+            zo_xy!{left_leg_max_x, leg_max_y},
+            zo_xy!{right_leg_min_x, y},
+            zo_xy!{right_leg_min_x, y},
+            //   Next tri but degenerate
+            zo_xy!{right_leg_min_x, y},
+            zo_xy!{right_leg_max_x, y},
+            zo_xy!{right_leg_max_x, y},
+            // Right leg
+            zo_xy!{right_leg_min_x, y},
+            zo_xy!{right_leg_max_x, y},
+            zo_xy!{right_leg_min_x, leg_max_y},
+            zo_xy!{right_leg_max_x, leg_max_y},
+        ]
+    };
+
+    commands.push(TriangleStrip(player, draw::Colour::Stone));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
