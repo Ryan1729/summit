@@ -1218,13 +1218,58 @@ pub fn update(
         let head_max_x = right_leg_min_x;
         let head_max_y = head_min_y + LEG_HEIGHT * 0.5;
 
+        let head_mid_x = (head_min_x + head_max_x) / 2.;
+        let head_mid_y = (head_min_y + head_max_y) / 2.;
+
+        let head_radius = head_max_x - head_mid_x;
+
+        const PI: f32 = core::f32::consts::PI;
         // Head
-        player.extend_from_slice(&[
-            zo_xy!{head_min_x, head_min_y},
-            zo_xy!{head_max_x, head_min_y},
-            zo_xy!{head_min_x, head_max_y},
-            zo_xy!{head_max_x, head_max_y},
-        ]);
+
+        // Based on https://stackoverflow.com/a/15296912
+        let mut angle = -PI/2.;
+        let step = PI/16.;
+        angle += step;
+
+        let head_point_1 = zo_xy!{head_min_x, head_mid_y};
+
+        // Pull an iteration out of th below loop so we have the first two points:
+        let (head_point_2, head_point_3) = {
+            let x = head_radius * angle.sin();
+            let y = head_radius * angle.cos();
+
+            angle += step;
+
+            (
+                zo_xy!{head_mid_x + x, head_mid_y + y},
+                zo_xy!{head_mid_x + x, head_mid_y - y},
+            )
+        };
+
+        push_dengenerate_to(
+            &mut player,
+            (
+                head_point_1,
+                head_point_2,
+            )
+        );
+
+        player.push(head_point_1);
+        player.push(head_point_2);
+        player.push(head_point_3);
+
+        while angle < PI/2. {
+            // TODO can we pull the trig functions out of the loop?
+            let x = head_radius * angle.sin();
+            let y = head_radius * angle.cos();
+
+            player.push(zo_xy!{head_mid_x + x, head_mid_y + y});
+            player.push(zo_xy!{head_mid_x + x, head_mid_y - y});
+
+            angle += step;
+        }
+
+        player.push(zo_xy!{head_max_x, head_mid_y});
 
         player
         .into_iter()
