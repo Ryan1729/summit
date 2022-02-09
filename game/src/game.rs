@@ -1212,6 +1212,20 @@ pub fn update(
             zo_xy!{torso_max_x, torso_max_y},
         ]);
 
+        let head_min_x = left_leg_max_x;
+        let head_min_y = torso_max_y;
+
+        let head_max_x = right_leg_min_x;
+        let head_max_y = head_min_y + LEG_HEIGHT * 0.5;
+
+        // Head
+        player.extend_from_slice(&[
+            zo_xy!{head_min_x, head_min_y},
+            zo_xy!{head_max_x, head_min_y},
+            zo_xy!{head_min_x, head_max_y},
+            zo_xy!{head_max_x, head_max_y},
+        ]);
+
         player
         .into_iter()
         .map(|xy| zo_to_draw_xy(&state.sizes, xy))
