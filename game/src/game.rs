@@ -562,6 +562,49 @@ fn push_spiky_triangles_with_floor_points(
     }
 }
 
+/// Jump discontinuously to another point using degenerate (zero area) triangles.
+fn push_dengenerate_to(
+    triangles: &mut Triangles,
+    (next1, next2): (zo::XY, zo::XY),
+) {
+    let len = triangles.len();
+
+    match (triangles.get(len - 2), triangles.get(len - 1)) {
+        (None, None) // Don't need extra triangle
+        | (Some(_), None) // Should be impossible
+        => {},
+        // An unusual/unexpected case we nevertheless try to handle
+        (None, Some(_prev)) => {
+            triangles.extend_from_slice(&[
+                // Make a degenerate triangle with this weird single point
+                next1,
+                next1,
+                // Next tri but degenerate
+                next1,
+                next2,
+                next2,
+            ]);
+        },
+        // The expected usual case
+        (Some(&prev2), Some(&prev1)) => {
+            triangles.extend_from_slice(&[
+                // Last tri but degenerate
+                prev2,
+                prev1,
+                prev1,
+                // Make the jump we want to make
+                prev1,
+                next1,
+                next1,
+                // Next tri but degenerate
+                next1,
+                next2,
+                next2,
+            ]);
+        },
+    }
+}
+
 fn push_evenly_spaced_triangles(
     triangles: &mut Triangles,
     Range { start, end }: Range<zo::XY>,
@@ -1116,36 +1159,63 @@ pub fn update(
         let left_leg_min_x = x - (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
         let left_leg_max_x = x - (BETWEEN_LEGS_HALF_WIDTH);
 
-        let right_leg_min_x = x + (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
-        let right_leg_max_x = x + (BETWEEN_LEGS_HALF_WIDTH);
+        let right_leg_min_x = x + (BETWEEN_LEGS_HALF_WIDTH);
+        let right_leg_max_x = x + (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
 
         let leg_max_y = y + LEG_HEIGHT;
 
-        declare_strip![
+        // TODO avoid this per-frame allocation or merge it with others.
+        let mut player = Vec::with_capacity(64);
+
+        player.extend_from_slice(&[
             // Left leg
             zo_xy!{left_leg_min_x, y},
             zo_xy!{left_leg_max_x, y},
             zo_xy!{left_leg_min_x, leg_max_y},
             zo_xy!{left_leg_max_x, leg_max_y},
-            // Degenerate triangles
-            //   Last tri but degenerate
-            zo_xy!{left_leg_min_x, leg_max_y},
-            zo_xy!{left_leg_max_x, leg_max_y},
-            zo_xy!{left_leg_max_x, leg_max_y},
-            //   Make the jump we want to make
-            zo_xy!{left_leg_max_x, leg_max_y},
-            zo_xy!{right_leg_min_x, y},
-            zo_xy!{right_leg_min_x, y},
-            //   Next tri but degenerate
-            zo_xy!{right_leg_min_x, y},
+        ]);
+
+        // Right leg
+        push_dengenerate_to(
+            &mut player,
+            (
+                zo_xy!{right_leg_max_x, y},
+                zo_xy!{right_leg_min_x, y},
+            )
+        );
+        player.extend_from_slice(&[
             zo_xy!{right_leg_max_x, y},
-            zo_xy!{right_leg_max_x, y},
-            // Right leg
             zo_xy!{right_leg_min_x, y},
-            zo_xy!{right_leg_max_x, y},
-            zo_xy!{right_leg_min_x, leg_max_y},
             zo_xy!{right_leg_max_x, leg_max_y},
-        ]
+            zo_xy!{right_leg_min_x, leg_max_y},
+        ]);
+
+        // Might want an extended hip or something later.
+        let torso_min_x = left_leg_min_x;
+        let torso_min_y = leg_max_y;
+
+        let torso_max_x = right_leg_max_x;
+        let torso_max_y = torso_min_y + LEG_HEIGHT * 1.25;
+
+        // Torso
+        push_dengenerate_to(
+            &mut player,
+            (
+                zo_xy!{torso_min_x, torso_min_y},
+                zo_xy!{torso_max_x, torso_min_y},
+            )
+        );
+        player.extend_from_slice(&[
+            zo_xy!{torso_min_x, torso_min_y},
+            zo_xy!{torso_max_x, torso_min_y},
+            zo_xy!{torso_min_x, torso_max_y},
+            zo_xy!{torso_max_x, torso_max_y},
+        ]);
+
+        player
+        .into_iter()
+        .map(|xy| zo_to_draw_xy(&state.sizes, xy))
+        .collect()
     };
 
     commands.push(TriangleStrip(player, draw::Colour::Stone));
