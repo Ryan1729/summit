@@ -1149,7 +1149,7 @@ pub fn update(
 
     let player = {
         let xy = state.board.player_xy;
-        let x = xy.x.0;
+        let x = xy.x.0 - 1./8.;
         let y = xy.y.0;
 
         const LEG_WIDTH: f32 = 1./64.;//1024.;
@@ -1226,7 +1226,7 @@ pub fn update(
         const PI: f32 = core::f32::consts::PI;
         // Head
 
-        // Based on https://stackoverflow.com/a/15296912
+        // Based on https://stackoverflow.com/a/26569822
         let mut angle = -PI/2.;
         let step = PI/16.;
         angle += step;
@@ -1235,14 +1235,20 @@ pub fn update(
 
         // Pull an iteration out of th below loop so we have the first two points:
         let (head_point_2, head_point_3) = {
-            let x = head_radius * angle.sin();
-            let y = head_radius * angle.cos();
+            let sine_of = angle.sin();
+            let cosine_of = angle.cos();
+
+            let x1 = head_radius * sine_of;
+            let y1 = head_radius * cosine_of;
+
+            let x2 = head_radius * (angle + PI).sin();
+            let y2 = head_radius * (angle + PI).cos();
 
             angle += step;
 
             (
-                zo_xy!{head_mid_x + x, head_mid_y + y},
-                zo_xy!{head_mid_x + x, head_mid_y - y},
+                zo_xy!{head_mid_x + x1, head_mid_y + y1},
+                zo_xy!{head_mid_x + x2, head_mid_y + y2},
             )
         };
 
@@ -1260,11 +1266,17 @@ pub fn update(
 
         while angle < PI/2. {
             // TODO can we pull the trig functions out of the loop?
-            let x = head_radius * angle.sin();
-            let y = head_radius * angle.cos();
+            let sine_of = angle.sin();
+            let cosine_of = angle.cos();
 
-            player.push(zo_xy!{head_mid_x + x, head_mid_y + y});
-            player.push(zo_xy!{head_mid_x + x, head_mid_y - y});
+            let x1 = head_radius * sine_of;
+            let y1 = head_radius * cosine_of;
+
+            let x2 = head_radius * -sine_of;
+            let y2 = head_radius * -cosine_of;
+    
+            player.push(zo_xy!{head_mid_x + x1, head_mid_y + y1});
+            player.push(zo_xy!{head_mid_x + x2, head_mid_y + y2});
 
             angle += step;
         }
