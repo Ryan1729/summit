@@ -742,13 +742,23 @@ fn push_overhang_triangles(
     )
 }
 
+type Radians = f32;
+
+const PI: Radians = core::f32::consts::PI;
+
+#[derive(Debug, Default)]
+struct Player {
+    xy: zo::XY,
+    angle: Radians,
+}
+
 #[derive(Debug, Default)]
 struct Board {
     tiles: Tiles,
     eye: Eye,
     triangles: Triangles,
     summit: zo::XY,
-    player_xy: zo::XY,
+    player: Player,
 }
 
 impl Board {
@@ -889,7 +899,11 @@ impl Board {
             },
             triangles,
             summit,
-            player_xy: <_>::default(),
+            player: Player {
+                // Something non-default for inital testing
+                xy: zo_xy!{0., summit.y.0},
+                angle: PI,
+            }, // <_>::default(),
         }
     }
 }
@@ -1148,13 +1162,18 @@ pub fn update(
     commands.push(TriangleStrip(flag, draw::Colour::Flag));
 
     let player = {
-        let xy = state.board.player_xy;
-        let x = xy.x.0;
-        let y = xy.y.0;
-
         const LEG_WIDTH: f32 = 1./64.;//1024.;
         const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
         const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
+
+        const TORSO_HEIGHT: f32 = LEG_HEIGHT * 1.25;
+        const HEAD_HEIGHT: f32 = LEG_HEIGHT * 0.5;
+
+        const PLAYER_HEIGHT: f32 = LEG_HEIGHT + TORSO_HEIGHT + HEAD_HEIGHT;
+
+        // We set these offsets so that we can rotate around the player's center.
+        let x = 0.0;
+        let y = -PLAYER_HEIGHT / 2.;
 
         let left_leg_min_x = x - (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
         let left_leg_max_x = x - (BETWEEN_LEGS_HALF_WIDTH);
@@ -1195,7 +1214,7 @@ pub fn update(
         let torso_min_y = leg_max_y;
 
         let torso_max_x = right_leg_max_x;
-        let torso_max_y = torso_min_y + LEG_HEIGHT * 1.25;
+        let torso_max_y = torso_min_y + TORSO_HEIGHT;
 
         // Torso
         push_dengenerate_to(
@@ -1216,14 +1235,13 @@ pub fn update(
         let head_min_y = torso_max_y;
 
         let head_max_x = right_leg_min_x;
-        let head_max_y = head_min_y + LEG_HEIGHT * 0.5;
+        let head_max_y = head_min_y + HEAD_HEIGHT;
 
         let head_mid_x = (head_min_x + head_max_x) / 2.;
         let head_mid_y = (head_min_y + head_max_y) / 2.;
 
         let head_radius = head_max_x - head_mid_x;
 
-        const PI: f32 = core::f32::consts::PI;
         // Head
 
         // Based on https://stackoverflow.com/a/15296912
@@ -1271,11 +1289,39 @@ pub fn update(
 
         player.push(zo_xy!{head_max_x, head_mid_y});
 
+        /// A 3 by 3 homogeneous affine trasformation matrix, with the bottom row
+        /// of `0 0 1` left implicit.
+        type Transform = [f32; 6];
+
+        let xy = state.board.player.xy;
+        let angle = state.board.player.angle;
+
+        let cos_of = angle.cos();
+        let sin_of = angle.sin();
+
+        let transform: Transform = [
+            cos_of, -sin_of, xy.x.0,
+            sin_of, cos_of, xy.y.0,
+        ];
+
+        for point in player.iter_mut() {
+            *point = zo_xy!{
+                point.x.0 * transform[0]
+                + point.y.0 * transform[1]
+                + /* 1. * */ transform[2],
+                point.x.0 * transform[3]
+                + point.y.0 * transform[4]
+                + /* 1. * */ transform[5],
+            }
+        }
+
         player
         .into_iter()
         .map(|xy| zo_to_draw_xy(&state.sizes, xy))
         .collect()
     };
+
+    state.board.player.angle += PI / 60.;
 
     commands.push(TriangleStrip(player, draw::Colour::Stone));
 
