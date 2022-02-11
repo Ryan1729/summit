@@ -165,6 +165,7 @@ pub enum Colour {
     Stone,
     Pole,
     Flag,
+    Arrow,
 }
 
 #[derive(Debug)]

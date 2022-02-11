@@ -1321,9 +1321,29 @@ pub fn update(
         .collect()
     };
 
+    commands.push(TriangleStrip(player, draw::Colour::Stone));
+
     state.board.player.angle += PI / 60.;
 
-    commands.push(TriangleStrip(player, draw::Colour::Stone));
+    let jump_arrow = {
+        const JUMP_ARROW_HALF_W: f32 = 1./16.;//1024.;
+        const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W / 2.;
+        
+        const JUMP_ARROW_MIN_X: f32 = -JUMP_ARROW_HALF_W;
+        const JUMP_ARROW_MAX_X: f32 = JUMP_ARROW_HALF_W;
+
+        const JUMP_ARROW_MIN_Y: f32 = -JUMP_ARROW_HALF_H;
+        const JUMP_ARROW_MAX_Y: f32 = JUMP_ARROW_HALF_H;
+
+        declare_strip![
+            zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MIN_Y },
+            zo_xy!{ 0.0, 0.0 },
+            zo_xy!{ 0.0, JUMP_ARROW_MAX_Y },
+            zo_xy!{ JUMP_ARROW_MAX_X, JUMP_ARROW_MIN_Y },
+        ]
+    };
+
+    commands.push(TriangleStrip(jump_arrow, draw::Colour::Arrow));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 

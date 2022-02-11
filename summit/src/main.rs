@@ -218,7 +218,9 @@ mod raylib_rs_platform {
                 Err(err) => err.duration(),
             };
 
-            duration.as_nanos()
+            let _ = duration.as_nanos();
+
+            1643795368538561068
         };
         println!("{}", seed);
 
@@ -233,6 +235,7 @@ mod raylib_rs_platform {
         const STONE: Color = Color{ r: 0x5a, g: 0x7d, b: 0x8b, a: 255 };
         const POLE: Color = Color{ r: 0x33, g: 0x52, b: 0xe1, a: 255 };
         const FLAG: Color = Color{ r: 0xde, g: 0x49, b: 0x49, a: 255 };
+        const ARROW: Color = Color{ r: 0x30, g: 0xb0, b: 0x6e, a: 255 };
         const TEXT: Color = WHITE;
         const NO_TINT: Color = WHITE;
         const OUTLINE: Color = WHITE;
@@ -459,6 +462,7 @@ mod raylib_rs_platform {
                                     Stone => STONE,
                                     Pole => POLE,
                                     Flag => FLAG,
+                                    Arrow => ARROW,
                                 }
                             );
                         }
