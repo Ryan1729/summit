@@ -1127,39 +1127,37 @@ pub fn update(
     let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
     let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
 
-    macro_rules! declare_strip {
-        ($($xys: expr),* $(,)?) => {{
-            vec![
-                $($xys),*
-            ]
+    macro_rules! convert_strip {
+        ($strip: expr) => {
+            $strip
                 .into_iter()
                 .map(|xy| zo_to_draw_xy(&state.sizes, xy))
                 .collect()
-        }}
+        }
     }
 
     // TODO avoid this per-frame allocation or merge it with others.
-    let pole = declare_strip![
+    let pole = vec![
         zo_xy!{ pole_min_x, summit_xy.y.0 },
         zo_xy!{ pole_max_x, summit_xy.y.0 },
         zo_xy!{ pole_min_x, pole_top_y },
         zo_xy!{ pole_max_x, pole_top_y },
     ];
 
-    commands.push(TriangleStrip(pole, draw::Colour::Pole));
+    commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
 
     const FLAG_H: f32 = POLE_H / 4.;
     const FLAG_W: f32 = FLAG_H;
 
     // TODO Animate the flag blowing in the wind.
 
-    let flag = declare_strip![
+    let flag = vec![
         zo_xy!{ pole_max_x, pole_top_y },
         zo_xy!{ pole_max_x, pole_top_y - FLAG_H },
         zo_xy!{ pole_max_x + FLAG_W, pole_top_y - FLAG_H / 2. },
     ];
 
-    commands.push(TriangleStrip(flag, draw::Colour::Flag));
+    commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
 
     let player = {
         const LEG_WIDTH: f32 = 1./64.;//1024.;
@@ -1316,12 +1314,9 @@ pub fn update(
         }
 
         player
-        .into_iter()
-        .map(|xy| zo_to_draw_xy(&state.sizes, xy))
-        .collect()
     };
 
-    commands.push(TriangleStrip(player, draw::Colour::Stone));
+    commands.push(TriangleStrip(convert_strip!(player), draw::Colour::Stone));
 
     state.board.player.angle += PI / 60.;
 
@@ -1335,7 +1330,7 @@ pub fn update(
         const JUMP_ARROW_MIN_Y: f32 = -JUMP_ARROW_HALF_H;
         const JUMP_ARROW_MAX_Y: f32 = JUMP_ARROW_HALF_H;
 
-        declare_strip![
+        vec![
             zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MIN_Y },
             zo_xy!{ 0.0, 0.0 },
             zo_xy!{ 0.0, JUMP_ARROW_MAX_Y },
@@ -1343,7 +1338,7 @@ pub fn update(
         ]
     };
 
-    commands.push(TriangleStrip(jump_arrow, draw::Colour::Arrow));
+    commands.push(TriangleStrip(convert_strip!(jump_arrow), draw::Colour::Arrow));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
