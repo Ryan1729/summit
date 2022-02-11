@@ -227,8 +227,26 @@ mod raylib_rs_platform {
         let mut state = game::State::from_seed(seed.to_le_bytes());
         let mut commands = Storage(Vec::with_capacity(1024));
 
+        macro_rules! get_cursor_xy {
+            () => {{
+                let pos = rl.get_mouse_position();
+
+                game::CursorXY {
+                    x: pos.x,
+                    y: pos.y,
+                }
+            }}
+        }
+
+
         // generate the commands for the first frame
-        game::update(&mut state, &mut commands, 0, draw_wh(&rl));
+        game::update(
+            &mut state,
+            &mut commands,
+            0,
+            get_cursor_xy!(),
+            draw_wh(&rl)
+        );
 
         const BACKGROUND: Color = Color{ r: 0x22, g: 0x22, b: 0x22, a: 255 };
         const WHITE: Color = Color{ r: 0xee, g: 0xee, b: 0xee, a: 255 };
@@ -335,6 +353,7 @@ mod raylib_rs_platform {
                 &mut state,
                 &mut commands,
                 input_flags,
+                get_cursor_xy!(),
                 draw_wh(&rl)
             );
 

@@ -490,6 +490,90 @@ mod zo {
     }
 }
 
+fn zo_to_draw_xy(sizes: &Sizes, xy: zo::XY) -> DrawXY {
+    DrawXY {
+        x: sizes.board_xywh.x + sizes.board_xywh.w * xy.x.0,
+        y: sizes.board_xywh.y + sizes.board_xywh.h * (TOP_Y - xy.y.0),
+    }
+}
+
+fn draw_to_zo_xy(sizes: &Sizes, xy: DrawXY) -> zo::XY {
+    zo_xy!{
+        (xy.x - sizes.board_xywh.x) / sizes.board_xywh.w,
+        TOP_Y - ((xy.y - sizes.board_xywh.y) / sizes.board_xywh.h),
+    }
+}
+
+#[test]
+fn zo_to_draw_to_zo_round_trips_on_these_examples() {
+    let sizes = draw::fresh_sizes(draw::EXAMPLE_WH);
+
+    // Short for assert.
+    macro_rules! a {
+        ($x: expr, $y: expr) => {
+            let example = zo_xy!{ $x, $y };
+            let round_tripped = draw_to_zo_xy(&sizes, zo_to_draw_xy(&sizes, example));
+
+            assert_eq!(round_tripped, example);
+        }
+    }
+
+    a!(0., 0.);
+    a!(0.5, 0.5);
+    a!(1., 0.);
+    a!(0., 1.);
+
+    a!(-0., 0.);
+    a!(-0.5, 0.5);
+    a!(-1., 0.);
+    a!(-0., 1.);
+
+    a!(0., -0.);
+    a!(0.5, -0.5);
+    a!(1., -0.);
+    a!(0., -1.);
+
+    a!(-0., -0.);
+    a!(-0.5, -0.5);
+    a!(-1., -0.);
+    a!(-0., -1.);
+}
+
+#[test]
+fn draw_to_zo_to_draw_round_trips_on_these_examples() {
+    let sizes = draw::fresh_sizes(draw::EXAMPLE_WH);
+
+    // Short for assert.
+    macro_rules! a {
+        ($x: expr, $y: expr) => {
+            let example = DrawXY{ x: $x, y: $y };
+            let round_tripped = zo_to_draw_xy(&sizes, draw_to_zo_xy(&sizes, example));
+
+            assert_eq!(round_tripped, example);
+        }
+    }
+
+    a!(0., 0.);
+    a!(0.5, 0.5);
+    a!(1., 0.);
+    a!(0., 1.);
+
+    a!(-0., 0.);
+    a!(-0.5, 0.5);
+    a!(-1., 0.);
+    a!(-0., 1.);
+
+    a!(0., -0.);
+    a!(0.5, -0.5);
+    a!(1., -0.);
+    a!(0., -1.);
+
+    a!(-0., -0.);
+    a!(-0.5, -0.5);
+    a!(-1., -0.);
+    a!(-0., -1.);
+}
+
 type Triangles = Vec<zo::XY>;
 
 pub const TOP_Y: f32 = 1.0;
@@ -934,6 +1018,23 @@ pub fn sizes(state: &State) -> draw::Sizes {
     state.sizes.clone()
 }
 
+/// A 3 by 3 homogeneous affine trasformation matrix, with the bottom row
+/// of `0 0 1` left implicit.
+type Transform = [f32; 6];
+
+fn apply_transform(xys: &mut [zo::XY], transform: Transform) {
+    for xy in xys.iter_mut() {
+        *xy = zo_xy!{
+            xy.x.0 * transform[0]
+            + xy.y.0 * transform[1]
+            + /* 1. * */ transform[2],
+            xy.x.0 * transform[3]
+            + xy.y.0 * transform[4]
+            + /* 1. * */ transform[5],
+        }
+    }
+}
+
 pub type InputFlags = u16;
 
 pub const INPUT_UP_PRESSED: InputFlags              = 0b0000_0000_0000_0001;
@@ -983,10 +1084,13 @@ impl Input {
     }
 }
 
+pub type CursorXY = DrawXY;
+
 pub fn update(
     state: &mut State,
     commands: &mut dyn ClearableStorage<draw::Command>,
     input_flags: InputFlags,
+    cursor_xy: CursorXY,
     draw_wh: DrawWH,
 ) {
     use draw::{TextSpec, TextKind, Command::*};
@@ -1102,13 +1206,6 @@ pub fn update(
         sprite: state.board.eye.state.sprite(),
         xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
     }));
-
-    fn zo_to_draw_xy(sizes: &Sizes, xy: zo::XY) -> DrawXY {
-        DrawXY {
-            x: sizes.board_xywh.x + sizes.board_xywh.w * xy.x.0,
-            y: sizes.board_xywh.y + sizes.board_xywh.h * (TOP_Y - xy.y.0),
-        }
-    }
 
     // TODO avoid this per-frame allocation or merge it with others.
     let mountain: draw::TriangleStrip = state.board.triangles
@@ -1287,31 +1384,18 @@ pub fn update(
 
         player.push(zo_xy!{head_max_x, head_mid_y});
 
-        /// A 3 by 3 homogeneous affine trasformation matrix, with the bottom row
-        /// of `0 0 1` left implicit.
-        type Transform = [f32; 6];
-
         let xy = state.board.player.xy;
         let angle = state.board.player.angle;
 
-        let cos_of = angle.cos();
-        let sin_of = angle.sin();
+        let (sin_of, cos_of) = angle.sin_cos();
 
-        let transform: Transform = [
-            cos_of, -sin_of, xy.x.0,
-            sin_of, cos_of, xy.y.0,
-        ];
-
-        for point in player.iter_mut() {
-            *point = zo_xy!{
-                point.x.0 * transform[0]
-                + point.y.0 * transform[1]
-                + /* 1. * */ transform[2],
-                point.x.0 * transform[3]
-                + point.y.0 * transform[4]
-                + /* 1. * */ transform[5],
-            }
-        }
+        apply_transform(
+            &mut player,
+            [
+                cos_of, -sin_of, xy.x.0,
+                sin_of, cos_of, xy.y.0,
+            ]
+        );
 
         player
     };
@@ -1321,21 +1405,43 @@ pub fn update(
     state.board.player.angle += PI / 60.;
 
     let jump_arrow = {
+        let x = 0.25;
+        let y = 0.25;
+
         const JUMP_ARROW_HALF_W: f32 = 1./16.;//1024.;
         const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W / 2.;
-        
+
         const JUMP_ARROW_MIN_X: f32 = -JUMP_ARROW_HALF_W;
         const JUMP_ARROW_MAX_X: f32 = JUMP_ARROW_HALF_W;
 
         const JUMP_ARROW_MIN_Y: f32 = -JUMP_ARROW_HALF_H;
         const JUMP_ARROW_MAX_Y: f32 = JUMP_ARROW_HALF_H;
 
-        vec![
+        let mut arrow = vec![
             zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MIN_Y },
             zo_xy!{ 0.0, 0.0 },
             zo_xy!{ 0.0, JUMP_ARROW_MAX_Y },
             zo_xy!{ JUMP_ARROW_MAX_X, JUMP_ARROW_MIN_Y },
-        ]
+        ];
+
+        let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
+
+        let rel_x = cursor_zo_xy.x.0 - x;
+        let rel_y = cursor_zo_xy.y.0 - y;
+
+        let angle = f32::atan2(rel_y, rel_x) - PI/2.;
+
+        let (sin_of, cos_of) = angle.sin_cos();
+
+        apply_transform(
+            &mut arrow,
+            [
+                cos_of, -sin_of, x,
+                sin_of, cos_of, y,
+            ]
+        );
+
+        arrow
     };
 
     commands.push(TriangleStrip(convert_strip!(jump_arrow), draw::Colour::Arrow));

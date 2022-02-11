@@ -69,6 +69,9 @@ pub struct DrawWH {
     pub h: DrawH,
 }
 
+#[cfg(test)]
+pub(crate) const EXAMPLE_WH: DrawWH = DrawWH { w: 1366., h: 768. };
+
 pub type TileCount = usize;
 pub type TileSideLength = DrawLength;
 
