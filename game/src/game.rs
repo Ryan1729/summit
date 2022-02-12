@@ -493,14 +493,14 @@ mod zo {
 fn zo_to_draw_xy(sizes: &Sizes, xy: zo::XY) -> DrawXY {
     DrawXY {
         x: sizes.board_xywh.x + sizes.board_xywh.w * xy.x.0,
-        y: sizes.board_xywh.y + sizes.board_xywh.h * (TOP_Y - xy.y.0),
+        y: sizes.board_xywh.y + (sizes.board_xywh.h * TOP_Y - sizes.board_xywh.h * xy.y.0),
     }
 }
 
 fn draw_to_zo_xy(sizes: &Sizes, xy: DrawXY) -> zo::XY {
     zo_xy!{
-        (xy.x - sizes.board_xywh.x) / sizes.board_xywh.w,
-        TOP_Y - ((xy.y - sizes.board_xywh.y) / sizes.board_xywh.h),
+        (xy.x / sizes.board_xywh.w) - (sizes.board_xywh.x / sizes.board_xywh.w),
+        TOP_Y - (((xy.y / sizes.board_xywh.h) - (sizes.board_xywh.y / sizes.board_xywh.h))),
     }
 }
 
