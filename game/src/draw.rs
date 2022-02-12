@@ -39,6 +39,14 @@ pub struct DrawXY {
     pub y: DrawY,
 }
 
+use core::fmt;
+
+impl fmt::Display for DrawXY {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
 impl core::ops::Add for DrawXY {
     type Output = Self;
 

@@ -439,6 +439,14 @@ mod zo {
         pub y: Y,
     }
 
+    use core::fmt;
+
+    impl fmt::Display for XY {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "({}, {})", self.x.0, self.y.0)
+        }
+    }
+
     #[macro_export]
     macro_rules! zo_xy {
         ($x: expr, $y: expr $(,)?) => {
@@ -504,6 +512,9 @@ fn draw_to_zo_xy(sizes: &Sizes, xy: DrawXY) -> zo::XY {
     }
 }
 
+#[cfg(test)]
+const ACCEPTABLE_EPSILON: f32 = f32::EPSILON;
+
 #[test]
 fn zo_to_draw_to_zo_round_trips_on_these_examples() {
     let sizes = draw::fresh_sizes(draw::EXAMPLE_WH);
@@ -514,7 +525,8 @@ fn zo_to_draw_to_zo_round_trips_on_these_examples() {
             let example = zo_xy!{ $x, $y };
             let round_tripped = draw_to_zo_xy(&sizes, zo_to_draw_xy(&sizes, example));
 
-            assert_eq!(round_tripped, example);
+            assert!((round_tripped.x.0 - example.x.0).abs() <= ACCEPTABLE_EPSILON, "{round_tripped} !~= {example} (x)");
+            assert!((round_tripped.y.0 - example.y.0).abs() <= ACCEPTABLE_EPSILON, "{round_tripped} !~= {example} (y)");
         }
     }
 
@@ -549,7 +561,8 @@ fn draw_to_zo_to_draw_round_trips_on_these_examples() {
             let example = DrawXY{ x: $x, y: $y };
             let round_tripped = zo_to_draw_xy(&sizes, draw_to_zo_xy(&sizes, example));
 
-            assert_eq!(round_tripped, example);
+            assert!((round_tripped.x - example.x).abs() <= ACCEPTABLE_EPSILON, "{round_tripped} !~= {example} (x)");
+            assert!((round_tripped.y - example.y).abs() <= ACCEPTABLE_EPSILON, "{round_tripped} !~= {example} (y)");
         }
     }
 
