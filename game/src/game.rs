@@ -507,8 +507,8 @@ fn zo_to_draw_xy(sizes: &Sizes, xy: zo::XY) -> DrawXY {
 
 fn draw_to_zo_xy(sizes: &Sizes, xy: DrawXY) -> zo::XY {
     zo_xy!{
-        (xy.x / sizes.board_xywh.w) - (sizes.board_xywh.x / sizes.board_xywh.w),
-        TOP_Y - (((xy.y / sizes.board_xywh.h) - (sizes.board_xywh.y / sizes.board_xywh.h))),
+        (xy.x - sizes.board_xywh.x) / sizes.board_xywh.w,
+        TOP_Y - ((xy.y - sizes.board_xywh.y) / sizes.board_xywh.h),
     }
 }
 
@@ -558,7 +558,7 @@ fn draw_to_zo_to_draw_round_trips_on_these_examples() {
     // Short for assert.
     macro_rules! a {
         ($x: expr, $y: expr) => {
-            let example = DrawXY{ x: $x, y: $y };
+            let example = DrawXY{ x: $x * draw::EXAMPLE_WH.w, y: $y * draw::EXAMPLE_WH.h };
             let round_tripped = zo_to_draw_xy(&sizes, draw_to_zo_xy(&sizes, example));
 
             assert!((round_tripped.x - example.x).abs() <= ACCEPTABLE_EPSILON, "{round_tripped} !~= {example} (x)");
