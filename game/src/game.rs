@@ -1440,8 +1440,8 @@ pub fn update(
     }
 
     let jump_arrow = {
-        const JUMP_ARROW_HALF_W: f32 = 1./16.;//1024.;
-        const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W / 2.;
+        const JUMP_ARROW_HALF_W: f32 = 1./32.;//1024.;
+        const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W * 2.;
 
         const JUMP_ARROW_MIN_X: f32 = -JUMP_ARROW_HALF_W;
         const JUMP_ARROW_MAX_X: f32 = JUMP_ARROW_HALF_W;
@@ -1450,10 +1450,10 @@ pub fn update(
         const JUMP_ARROW_MAX_Y: f32 = JUMP_ARROW_HALF_H;
 
         let mut arrow = vec![
-            zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MIN_Y },
+            zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MAX_Y },
             zo_xy!{ 0.0, 0.0 },
-            zo_xy!{ 0.0, JUMP_ARROW_MAX_Y },
-            zo_xy!{ JUMP_ARROW_MAX_X, JUMP_ARROW_MIN_Y },
+            zo_xy!{ JUMP_ARROW_MAX_X, 0.0 },
+            zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MIN_Y },
         ];
 
         let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
@@ -1466,7 +1466,7 @@ pub fn update(
 
         let angle = f32::atan2(rel_y, rel_x);
 
-        const ARROW_RADIUS: f32 = JUMP_ARROW_HALF_W * 4.;
+        const ARROW_RADIUS: f32 = JUMP_ARROW_HALF_W * 8.;
 
         let (sin_of, cos_of) = angle.sin_cos();
 
@@ -1478,8 +1478,6 @@ pub fn update(
 
         let x = xy.x.0;
         let y = xy.y.0;
-
-        dbg!((x, y));
 
         apply_transform(
             &mut arrow,
