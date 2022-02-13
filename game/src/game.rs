@@ -1099,12 +1099,15 @@ impl Input {
 
 pub type CursorXY = DrawXY;
 
+pub type DeltaTimeInSeconds = f32;
+
 pub fn update(
     state: &mut State,
     commands: &mut dyn ClearableStorage<draw::Command>,
     input_flags: InputFlags,
     cursor_xy: CursorXY,
     draw_wh: DrawWH,
+    dt: DeltaTimeInSeconds
 ) {
     use draw::{TextSpec, TextKind, Command::*};
 
@@ -1203,6 +1206,8 @@ pub fn update(
             state.board.eye.state = SmallPupil;
         },
     }
+
+    state.board.player.angle += PI * dt;
 
     for i in 0..TILES_LENGTH {
         let tile_data = state.board.tiles.tiles[i];
@@ -1414,8 +1419,6 @@ pub fn update(
     };
 
     commands.push(TriangleStrip(convert_strip!(player), draw::Colour::Stone));
-
-    state.board.player.angle += PI / 60.;
 
     fn move_along_angle_with_pre_sin_cos(
         (sin, cos): (Radians, Radians),

@@ -245,7 +245,8 @@ mod raylib_rs_platform {
             &mut commands,
             0,
             get_cursor_xy!(),
-            draw_wh(&rl)
+            draw_wh(&rl),
+            rl.get_frame_time(),
         );
 
         const BACKGROUND: Color = Color{ r: 0x22, g: 0x22, b: 0x22, a: 255 };
@@ -354,7 +355,8 @@ mod raylib_rs_platform {
                 &mut commands,
                 input_flags,
                 get_cursor_xy!(),
-                draw_wh(&rl)
+                draw_wh(&rl),
+                rl.get_frame_time(),
             );
 
             current_stats.update.end = Instant::now();
