@@ -1417,10 +1417,29 @@ pub fn update(
 
     state.board.player.angle += PI / 60.;
 
-    let jump_arrow = {
-        let x = 0.25;
-        let y = 0.25;
+    fn move_along_angle_with_pre_sin_cos(
+        (sin, cos): (Radians, Radians),
+        radius: f32,
+        at: zo::XY,
+    ) -> zo::XY {
+        // To move along the angle, we find the x and y of an axis-aligned right
+        // triangle, where the hypotenuse starts at the current point, and ends
+        // at the desired point.
+        //   /|
+        // H/ |O
+        // /__|
+        //   A
 
+        // cos(angle) = A / H, so A = cos(angle) * H.
+        let x = at.x.0 + cos * radius;
+
+        // sin(angle) = O / H, so O = sin(angle) * H.
+        let y = at.y.0 + sin * radius;
+
+        zo_xy!{x, y}
+    }
+
+    let jump_arrow = {
         const JUMP_ARROW_HALF_W: f32 = 1./16.;//1024.;
         const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W / 2.;
 
@@ -1439,12 +1458,28 @@ pub fn update(
 
         let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
 
-        let rel_x = cursor_zo_xy.x.0 - x;
-        let rel_y = cursor_zo_xy.y.0 - y;
+        let px = state.board.player.xy.x.0;
+        let py = state.board.player.xy.y.0;
 
-        let angle = f32::atan2(rel_y, rel_x) - PI/2.;
+        let rel_x = cursor_zo_xy.x.0 - px;
+        let rel_y = cursor_zo_xy.y.0 - py;
+
+        let angle = f32::atan2(rel_y, rel_x);
+
+        const ARROW_RADIUS: f32 = JUMP_ARROW_HALF_W * 4.;
 
         let (sin_of, cos_of) = angle.sin_cos();
+
+        let xy = move_along_angle_with_pre_sin_cos(
+            (sin_of, cos_of),
+            ARROW_RADIUS,
+            state.board.player.xy,
+        );
+
+        let x = xy.x.0;
+        let y = xy.y.0;
+
+        dbg!((x, y));
 
         apply_transform(
             &mut arrow,
