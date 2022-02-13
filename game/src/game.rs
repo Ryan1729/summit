@@ -423,6 +423,8 @@ struct Eye {
 
 // Short for "zero-one", which seemed better than `_01`.
 mod zo {
+    use core::ops::{AddAssign, SubAssign, Sub, MulAssign, Mul};
+
     /// Values outside the range [0, 1] are expected, but they are expected to be
     /// clipped later.
     pub type Zo = f32;
@@ -430,13 +432,124 @@ mod zo {
     #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
     pub struct X(pub(crate) Zo);
 
+    impl AddAssign for X {
+        fn add_assign(&mut self, other: Self) {
+            self.0 += other.0;
+        }
+    }
+
+    impl SubAssign for X {
+        fn sub_assign(&mut self, other: Self) {
+            self.0 -= other.0;
+        }
+    }
+
+    impl Sub for X {
+        type Output = Self;
+
+        fn sub(mut self, other: Self) -> Self::Output {
+            self -= other;
+            self
+        }
+    }
+
+    impl MulAssign<Zo> for X {
+        fn mul_assign(&mut self, scale: Zo) {
+            self.0 *= scale;
+        }
+    }
+
+    impl Mul<Zo> for X {
+        type Output = Self;
+
+        fn mul(mut self, scale: Zo) -> Self::Output {
+            self *= scale;
+            self
+        }
+    }
+
     #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
     pub struct Y(pub(crate) Zo);
+
+    impl AddAssign for Y {
+        fn add_assign(&mut self, other: Self) {
+            self.0 += other.0;
+        }
+    }
+
+    impl SubAssign for Y {
+        fn sub_assign(&mut self, other: Self) {
+            self.0 -= other.0;
+        }
+    }
+
+    impl Sub for Y {
+        type Output = Self;
+
+        fn sub(mut self, other: Self) -> Self::Output {
+            self -= other;
+            self
+        }
+    }
+
+    impl MulAssign<Zo> for Y {
+        fn mul_assign(&mut self, scale: Zo) {
+            self.0 *= scale;
+        }
+    }
+
+    impl Mul<Zo> for Y {
+        type Output = Self;
+
+        fn mul(mut self, scale: Zo) -> Self::Output {
+            self *= scale;
+            self
+        }
+    }
 
     #[derive(Copy, Clone, Debug, Default, PartialEq)]
     pub struct XY {
         pub x: X,
         pub y: Y,
+    }
+
+    impl AddAssign for XY {
+        fn add_assign(&mut self, other: Self) {
+            self.x += other.x;
+            self.y += other.y;
+        }
+    }
+
+    impl SubAssign for XY {
+        fn sub_assign(&mut self, other: Self) {
+            self.x -= other.x;
+            self.y -= other.y;
+        }
+    }
+
+    impl Sub for XY {
+        type Output = Self;
+
+        fn sub(mut self, other: Self) -> Self::Output {
+            self -= other;
+            self
+        }
+    }
+
+    impl MulAssign<Zo> for XY {
+        fn mul_assign(&mut self, scale: Zo) {
+            self.x *= scale;
+            self.y *= scale;
+        }
+    }
+
+    impl Mul<Zo> for XY {
+        type Output = Self;
+
+        fn mul(mut self, scale: Zo) -> Self::Output {
+            self *= scale;
+            self
+        }
     }
 
     use core::fmt;
@@ -1207,7 +1320,12 @@ pub fn update(
         },
     }
 
+    let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
+
+    let cursor_rel_xy = cursor_zo_xy - state.board.player.xy;
+
     state.board.player.angle += PI * dt;
+    state.board.player.xy += cursor_rel_xy * dt;
 
     for i in 0..TILES_LENGTH {
         let tile_data = state.board.tiles.tiles[i];
@@ -1459,15 +1577,7 @@ pub fn update(
             zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MIN_Y },
         ];
 
-        let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
-
-        let px = state.board.player.xy.x.0;
-        let py = state.board.player.xy.y.0;
-
-        let rel_x = cursor_zo_xy.x.0 - px;
-        let rel_y = cursor_zo_xy.y.0 - py;
-
-        let angle = f32::atan2(rel_y, rel_x);
+        let angle = f32::atan2(cursor_rel_xy.y.0, cursor_rel_xy.x.0);
 
         const ARROW_RADIUS: f32 = JUMP_ARROW_HALF_W * 8.;
 
