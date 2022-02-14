@@ -867,6 +867,8 @@ fn push_evenly_spaced_triangles_section(
     push_evenly_spaced_triangles(triangles, range, count)
 }
 
+const OVERHANG_MIN_X: zo::X = zo::X(1. / 64.);
+
 fn push_overhang_triangles(
     triangles: &mut Triangles,
     rng: &mut Xs,
@@ -937,6 +939,8 @@ fn push_overhang_triangles(
         // the `push_with_floor_point` procedure.
         triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(BOTTOM_Y) });
         let mut overhang_x = x - x_delta * 2.;
+
+        if overhang_x < OVERHANG_MIN_X.0 { overhang_x = OVERHANG_MIN_X.0; }
         if overhang_x < min_x { overhang_x = min_x; }
         triangles.push(zo::XY{ x: zo::X(overhang_x), y: zo::Y(y) });
 
@@ -1049,6 +1053,8 @@ fn push_random_length_overhang_triangles(
                 used += 1;
         
                 let mut overhang_x = x - x_delta * (used as f32);
+
+                if overhang_x < OVERHANG_MIN_X.0 { overhang_x = OVERHANG_MIN_X.0; }
                 if overhang_x < min_x { overhang_x = min_x; }
                 triangles.push(zo::XY{ x: zo::X(overhang_x), y: zo::Y(y) });
                 used += 1;
