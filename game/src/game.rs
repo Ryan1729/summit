@@ -952,6 +952,122 @@ fn push_overhang_triangles(
     )
 }
 
+fn push_random_length_overhang_triangles(
+    triangles: &mut Triangles,
+    rng: &mut Xs,
+    Range { start, end }: Range<zo::XY>,
+    count: usize
+) {
+    let mut remaining_count = count;
+
+    macro_rules! early_out {
+        () => { if remaining_count == 0 { return; } }
+    }
+
+    early_out!();
+
+    let mut x_base = start.x.0;
+    let mut y_base = start.y.0;
+
+    let start_len = triangles.len();
+
+    if start_len == 0 {
+        triangles.push(zo::XY{ x: zo::X(x_base), y: zo::Y(y_base) });
+
+        remaining_count -= 1;
+
+        early_out!();
+    }
+
+    let (min_x, min_y) = zo::minimums((start, end));
+    let (min_x, min_y) = (min_x.0, min_y.0);
+    let (max_x, max_y) = zo::maximums((start, end));
+    let (max_x, max_y) = (max_x.0, max_y.0);
+
+    const PER_OVERHANG_MINIMUM: u32 = 4;
+
+    compile_time_assert!(usize::BITS >= u32::BITS);
+    if remaining_count >= PER_OVERHANG_MINIMUM as usize {
+        let available_to_use: u32 = xs_range(
+            rng,
+            PER_OVERHANG_MINIMUM..(remaining_count.saturating_add(1)) as u32
+        );
+        
+        const POINTS_PER_DELTA: f32 = 2.;
+    
+        let x_delta = (end.x.0 - start.x.0) / (count as f32 / POINTS_PER_DELTA);
+        let y_delta = (end.y.0 - start.y.0) / (count as f32 / POINTS_PER_DELTA);
+    
+        compile_time_assert!(usize::BITS >= u32::BITS);
+    
+        while remaining_count >= PER_OVERHANG_MINIMUM as usize {
+            let mut used = 0;
+            
+            const USED_IN_THIS_LOOP: u32 = 2;
+            while available_to_use - used >= USED_IN_THIS_LOOP + PER_OVERHANG_MINIMUM {
+                x_base += x_delta;
+                y_base += y_delta;
+
+                let x = x_base + x_delta * xs_zero_to_one(rng);
+
+                triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(BOTTOM_Y) });
+                triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(y_base + y_delta) });
+                used += USED_IN_THIS_LOOP;
+            }
+
+            x_base += x_delta;
+            y_base += y_delta;
+    
+            macro_rules! gen_xy {
+                () => {{
+                    let mut x = x_base + x_delta * xs_minus_one_to_one(rng);
+                    let mut y = y_base + y_delta * xs_minus_one_to_one(rng);
+    
+                    if x < min_x { x = min_x; }
+                    if y < min_y { y = min_y; }
+    
+                    if x > max_x { x = max_x; }
+                    if y > max_y { y = max_y; }
+    
+                    (x, y)
+                }}
+            }
+    
+            // PER_OVERHANG_MINIMUM corresponds to the amount used in this block
+            {
+                let (x, y) = gen_xy!();
+        
+                push_with_floor_point(triangles, zo_xy!{x, y});
+                used += 2;
+        
+                x_base += x_delta;
+                y_base += y_delta;
+        
+                let (x, y) = gen_xy!();
+        
+                triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(BOTTOM_Y) });
+                used += 1;
+        
+                let mut overhang_x = x - x_delta * (used as f32);
+                if overhang_x < min_x { overhang_x = min_x; }
+                triangles.push(zo::XY{ x: zo::X(overhang_x), y: zo::Y(y) });
+                used += 1;
+            }
+
+            compile_time_assert!(usize::BITS >= u32::BITS);    
+            remaining_count = remaining_count.saturating_sub(used as usize);
+        }
+    }
+
+    early_out!();
+
+    push_evenly_spaced_triangles(
+        triangles,
+        zo_xy!{ x_base, y_base }..end,
+        count - (triangles.len() - start_len),
+    )
+}
+
 type Radians = f32;
 
 const PI: Radians = core::f32::consts::PI;
@@ -998,10 +1114,11 @@ impl Board {
         assert!(edge_count >= 2);
         let per_slope = edge_count / 2;
 
-        const SECTIONS: [MountainSection; 4] = [
+        const SECTIONS: [MountainSection; 5] = [
             push_evenly_spaced_triangles_section,
             push_spiky_triangles_with_floor_points,
             push_overhang_triangles,
+            push_random_length_overhang_triangles,
 
             // TODO make a function that deterministically produces a spiral overhang.
 
@@ -1031,7 +1148,7 @@ impl Board {
 
             let mut remaining = count;
             loop {
-                let mut count_for_this_section = xs_range(rng, 0..8) as usize;
+                let mut count_for_this_section = xs_range(rng, 0..12) as usize;
 
                 if remaining < count_for_this_section {
                     count_for_this_section = remaining;
