@@ -1331,10 +1331,15 @@ pub fn update(
 
     let cursor_rel_xy = cursor_zo_xy - state.board.player.xy;
 
+    const GRAVITY: zo::XY = zo_xy!{0., -1./64.};
+
+    let mut player_impulse = GRAVITY;
+
     if left_mouse_button_down {
-        state.board.player.xy += cursor_rel_xy * dt;
+        player_impulse += cursor_zo_xy - state.board.player.xy;
     }
 
+    state.board.player.xy += player_impulse * dt;
     state.board.player.angle += PI * dt;
 
     //
