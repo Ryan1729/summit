@@ -1174,6 +1174,11 @@ pub const INPUT_LEFT_DOWN: InputFlags               = 0b0000_0000_0100_0000;
 pub const INPUT_RIGHT_DOWN: InputFlags              = 0b0000_0000_1000_0000;
 
 pub const INPUT_INTERACT_PRESSED: InputFlags        = 0b0000_0001_0000_0000;
+pub const INPUT_INTERACT_DOWN: InputFlags           = 0b0000_0010_0000_0000;
+
+/// Should be set if the mouse button was pressed or released this frame.
+pub const INPUT_LEFT_MOUSE_CHANGED: InputFlags      = 0b0000_0100_0000_0000;
+pub const INPUT_LEFT_MOUSE_DOWN: InputFlags         = 0b0000_1000_0000_0000;
 
 #[derive(Clone, Copy, Debug)]
 enum Input {
@@ -1229,6 +1234,8 @@ pub fn update(
     }
 
     commands.clear();
+
+    let left_mouse_button_down = input_flags & INPUT_LEFT_MOUSE_DOWN != 0;
 
     let input = Input::from_flags(input_flags);
 
@@ -1324,8 +1331,15 @@ pub fn update(
 
     let cursor_rel_xy = cursor_zo_xy - state.board.player.xy;
 
+    if left_mouse_button_down {
+        state.board.player.xy += cursor_rel_xy * dt;
+    }
+
     state.board.player.angle += PI * dt;
-    state.board.player.xy += cursor_rel_xy * dt;
+
+    //
+    // Render
+    //
 
     for i in 0..TILES_LENGTH {
         let tile_data = state.board.tiles.tiles[i];

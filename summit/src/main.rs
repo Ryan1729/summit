@@ -98,7 +98,10 @@ mod raylib_rs_platform {
     use raylib::prelude::{
         *,
         KeyboardKey::*,
-        ffi::LoadImageFromMemory,
+        ffi::{
+            LoadImageFromMemory,
+            MouseButton::MOUSE_LEFT_BUTTON,
+        },
         core::{
             drawing::{RaylibTextureModeExt, RaylibShaderModeExt},
             logging
@@ -345,6 +348,15 @@ mod raylib_rs_platform {
 
             if rl.is_key_pressed(KEY_RIGHT) || rl.is_key_pressed(KEY_D) {
                 input_flags |= game::INPUT_RIGHT_PRESSED;
+            }
+
+            if rl.is_mouse_button_pressed(MOUSE_LEFT_BUTTON)
+            || rl.is_mouse_button_released(MOUSE_LEFT_BUTTON) {
+                input_flags |= game::INPUT_LEFT_MOUSE_CHANGED;
+            }
+
+            if rl.is_mouse_button_down(MOUSE_LEFT_BUTTON) {
+                input_flags |= game::INPUT_LEFT_MOUSE_DOWN;
             }
 
             current_stats.input_gather.end = Instant::now();
