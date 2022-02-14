@@ -1342,6 +1342,9 @@ pub fn update(
     state.board.player.xy += player_impulse * dt;
     state.board.player.angle += PI * dt;
 
+    // TODO real collision detection
+    let is_colliding = state.board.player.xy.y.0 < 0.5;
+
     //
     // Render
     //
@@ -1368,7 +1371,13 @@ pub fn update(
         .map(|xy| zo_to_draw_xy(&state.sizes, *xy))
         .collect();
 
-    commands.push(TriangleStrip(mountain, draw::Colour::Stone));
+    let mountain_colour = if is_colliding {
+        draw::Colour::Pole
+    } else {
+        draw::Colour::Stone
+    };
+
+    commands.push(TriangleStrip(mountain, mountain_colour));
 
     let summit_xy = state.board.summit;
 
@@ -1379,6 +1388,14 @@ pub fn update(
     let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
     let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
 
+    // TODO avoid this per-frame allocation or merge it with others.
+    let pole = vec![
+        zo_xy!{ pole_min_x, summit_xy.y.0 },
+        zo_xy!{ pole_max_x, summit_xy.y.0 },
+        zo_xy!{ pole_min_x, pole_top_y },
+        zo_xy!{ pole_max_x, pole_top_y },
+    ];
+
     macro_rules! convert_strip {
         ($strip: expr) => {
             $strip
@@ -1387,14 +1404,6 @@ pub fn update(
                 .collect()
         }
     }
-
-    // TODO avoid this per-frame allocation or merge it with others.
-    let pole = vec![
-        zo_xy!{ pole_min_x, summit_xy.y.0 },
-        zo_xy!{ pole_max_x, summit_xy.y.0 },
-        zo_xy!{ pole_min_x, pole_top_y },
-        zo_xy!{ pole_max_x, pole_top_y },
-    ];
 
     commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
 
