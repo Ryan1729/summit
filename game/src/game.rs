@@ -702,6 +702,52 @@ fn draw_to_zo_to_draw_round_trips_on_these_examples() {
 
 type Triangles = Vec<zo::XY>;
 
+type Line = (zo::XY, zo::XY);
+
+fn lines_collide(l1: Line, l2: Line) -> bool {
+    if l1 == l2 { return true }
+
+    // Thi is based on this wikipedia page:
+    // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment
+
+    // Two terms, `t` and `u` are defined there, including formulae for them.
+
+    // For the intersection point, (if any) between the lines `t` and `u` are the
+    // fraction of the way from `l1.0` to `l1.1`, and `l2.0` to `l2.1` respectively.
+    // That is, for varying values of `t`, (for example) from 0 to 1,
+    // `l1.0 * t(l1.1 - l1.0)` takes on all points that are a part of `l1`.
+
+    // From these definitions, we can apparently conclude that the will be an
+    // intersection if and only if `t` and `u` are in the range [0, 1].
+
+    let x1 = l1.0.x.0;
+    let y1 = l1.0.y.0;
+
+    let x2 = l1.1.x.0;
+    let y2 = l1.1.y.0;
+
+    let x3 = l2.0.x.0;
+    let y3 = l2.0.y.0;
+
+    let x4 = l2.1.x.0;
+    let y4 = l2.1.y.0;
+
+    // The formulae given are fractions with the same denominator, which we will
+    // call `d`. We can avoid dividing by that denominator by checking that
+    // `t * d` and `u * d` are in the range [0, `d`].
+
+    let d = ((x1 - x2) * (y3 - y4)) - ((x3 - x4) * (y1 - y2));
+
+    let t_times_d = ((x1 - x3) * (y3 - y4)) - ((x3 - x4) * (y1 - y3));
+    let u_times_d = ((x1 - x3) * (y1 - y2)) - ((x1 - x2) * (y1 - y3));
+
+    debug_assert!(d >= 0.);
+    debug_assert!(t_times_d >= 0.);
+    debug_assert!(u_times_d >= 0.);
+
+    0. <= t_times_d && t_times_d <= d && 0. <= u_times_d && u_times_d <= d
+}
+
 pub const TOP_Y: f32 = 1.0;
 pub const BOTTOM_Y: f32 = 0.0;
 
@@ -996,17 +1042,17 @@ fn push_random_length_overhang_triangles(
             rng,
             PER_OVERHANG_MINIMUM..(remaining_count.saturating_add(1)) as u32
         );
-        
+
         const POINTS_PER_DELTA: f32 = 2.;
-    
+
         let x_delta = (end.x.0 - start.x.0) / (count as f32 / POINTS_PER_DELTA);
         let y_delta = (end.y.0 - start.y.0) / (count as f32 / POINTS_PER_DELTA);
-    
+
         compile_time_assert!(usize::BITS >= u32::BITS);
-    
+
         while remaining_count >= PER_OVERHANG_MINIMUM as usize {
             let mut used = 0;
-            
+
             const USED_IN_THIS_LOOP: u32 = 2;
             while available_to_use - used >= USED_IN_THIS_LOOP + PER_OVERHANG_MINIMUM {
                 x_base += x_delta;
@@ -1021,37 +1067,37 @@ fn push_random_length_overhang_triangles(
 
             x_base += x_delta;
             y_base += y_delta;
-    
+
             macro_rules! gen_xy {
                 () => {{
                     let mut x = x_base + x_delta * xs_minus_one_to_one(rng);
                     let mut y = y_base + y_delta * xs_minus_one_to_one(rng);
-    
+
                     if x < min_x { x = min_x; }
                     if y < min_y { y = min_y; }
-    
+
                     if x > max_x { x = max_x; }
                     if y > max_y { y = max_y; }
-    
+
                     (x, y)
                 }}
             }
-    
+
             // PER_OVERHANG_MINIMUM corresponds to the amount used in this block
             {
                 let (x, y) = gen_xy!();
-        
+
                 push_with_floor_point(triangles, zo_xy!{x, y});
                 used += 2;
-        
+
                 x_base += x_delta;
                 y_base += y_delta;
-        
+
                 let (x, y) = gen_xy!();
-        
+
                 triangles.push(zo::XY{ x: zo::X(x), y: zo::Y(BOTTOM_Y) });
                 used += 1;
-        
+
                 let mut overhang_x = x - x_delta * (used as f32);
 
                 if overhang_x < OVERHANG_MIN_X.0 { overhang_x = OVERHANG_MIN_X.0; }
@@ -1060,7 +1106,7 @@ fn push_random_length_overhang_triangles(
                 used += 1;
             }
 
-            compile_time_assert!(usize::BITS >= u32::BITS);    
+            compile_time_assert!(usize::BITS >= u32::BITS);
             remaining_count = remaining_count.saturating_sub(used as usize);
         }
     }
@@ -1465,85 +1511,7 @@ pub fn update(
     state.board.player.xy += player_impulse * dt;
     state.board.player.angle += PI * dt;
 
-    // TODO real collision detection
-    let is_colliding = state.board.player.xy.y.0 < 0.5;
-
-    //
-    // Render
-    //
-
-    for i in 0..TILES_LENGTH {
-        let tile_data = state.board.tiles.tiles[i];
-
-        let txy = tile::i_to_xy(i);
-
-        commands.push(Sprite(SpriteSpec{
-            sprite: tile_data.sprite(),
-            xy: draw_xy_from_tile(&state.sizes, txy),
-        }));
-    }
-
-    commands.push(Sprite(SpriteSpec{
-        sprite: state.board.eye.state.sprite(),
-        xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
-    }));
-
-    // TODO avoid this per-frame allocation or merge it with others.
-    let mountain: draw::TriangleStrip = state.board.triangles
-        .iter()
-        .map(|xy| zo_to_draw_xy(&state.sizes, *xy))
-        .collect();
-
-    let mountain_colour = if is_colliding {
-        draw::Colour::Pole
-    } else {
-        draw::Colour::Stone
-    };
-
-    commands.push(TriangleStrip(mountain, mountain_colour));
-
-    let summit_xy = state.board.summit;
-
-    const POLE_HALF_W: f32 = 1./1024.;
-    const POLE_H: f32 = POLE_HALF_W * 32.;//8.;
-
-    let pole_top_y = summit_xy.y.0 + POLE_H;
-    let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
-    let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
-
-    // TODO avoid this per-frame allocation or merge it with others.
-    let pole = vec![
-        zo_xy!{ pole_min_x, summit_xy.y.0 },
-        zo_xy!{ pole_max_x, summit_xy.y.0 },
-        zo_xy!{ pole_min_x, pole_top_y },
-        zo_xy!{ pole_max_x, pole_top_y },
-    ];
-
-    macro_rules! convert_strip {
-        ($strip: expr) => {
-            $strip
-                .into_iter()
-                .map(|xy| zo_to_draw_xy(&state.sizes, xy))
-                .collect()
-        }
-    }
-
-    commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
-
-    const FLAG_H: f32 = POLE_H / 4.;
-    const FLAG_W: f32 = FLAG_H;
-
-    // TODO Animate the flag blowing in the wind.
-
-    let flag = vec![
-        zo_xy!{ pole_max_x, pole_top_y },
-        zo_xy!{ pole_max_x, pole_top_y - FLAG_H },
-        zo_xy!{ pole_max_x + FLAG_W, pole_top_y - FLAG_H / 2. },
-    ];
-
-    commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
-
-    let player = {
+    let player_triangles = {
         const LEG_WIDTH: f32 = 1./64.;//1024.;
         const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
         const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
@@ -1687,7 +1655,92 @@ pub fn update(
         player
     };
 
-    commands.push(TriangleStrip(convert_strip!(player), draw::Colour::Stone));
+    let mut is_colliding = false;
+    for pw in player_triangles.windows(2) {
+        // TODO Use a spatial partition to reduce the amount of mountain lines
+        // we need to test.
+        for mw in state.board.triangles.windows(2) {
+            is_colliding |= lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
+            if is_colliding { break }
+        }
+    }
+
+    //
+    // Render
+    //
+
+    for i in 0..TILES_LENGTH {
+        let tile_data = state.board.tiles.tiles[i];
+
+        let txy = tile::i_to_xy(i);
+
+        commands.push(Sprite(SpriteSpec{
+            sprite: tile_data.sprite(),
+            xy: draw_xy_from_tile(&state.sizes, txy),
+        }));
+    }
+
+    commands.push(Sprite(SpriteSpec{
+        sprite: state.board.eye.state.sprite(),
+        xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
+    }));
+
+    // TODO avoid this per-frame allocation or merge it with others.
+    let mountain: draw::TriangleStrip = state.board.triangles
+        .iter()
+        .map(|xy| zo_to_draw_xy(&state.sizes, *xy))
+        .collect();
+
+    let mountain_colour = if is_colliding {
+        draw::Colour::Pole
+    } else {
+        draw::Colour::Stone
+    };
+
+    commands.push(TriangleStrip(mountain, mountain_colour));
+
+    let summit_xy = state.board.summit;
+
+    const POLE_HALF_W: f32 = 1./1024.;
+    const POLE_H: f32 = POLE_HALF_W * 32.;//8.;
+
+    let pole_top_y = summit_xy.y.0 + POLE_H;
+    let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
+    let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
+
+    // TODO avoid this per-frame allocation or merge it with others.
+    let pole = vec![
+        zo_xy!{ pole_min_x, summit_xy.y.0 },
+        zo_xy!{ pole_max_x, summit_xy.y.0 },
+        zo_xy!{ pole_min_x, pole_top_y },
+        zo_xy!{ pole_max_x, pole_top_y },
+    ];
+
+    macro_rules! convert_strip {
+        ($strip: expr) => {
+            $strip
+                .into_iter()
+                .map(|xy| zo_to_draw_xy(&state.sizes, xy))
+                .collect()
+        }
+    }
+
+    commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
+
+    const FLAG_H: f32 = POLE_H / 4.;
+    const FLAG_W: f32 = FLAG_H;
+
+    // TODO Animate the flag blowing in the wind.
+
+    let flag = vec![
+        zo_xy!{ pole_max_x, pole_top_y },
+        zo_xy!{ pole_max_x, pole_top_y - FLAG_H },
+        zo_xy!{ pole_max_x + FLAG_W, pole_top_y - FLAG_H / 2. },
+    ];
+
+    commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
+
+    commands.push(TriangleStrip(convert_strip!(player_triangles), draw::Colour::Stone));
 
     fn move_along_angle_with_pre_sin_cos(
         (sin, cos): (Radians, Radians),
