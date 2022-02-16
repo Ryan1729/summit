@@ -1656,56 +1656,52 @@ pub fn update(
 
     let player_triangles_before_movement = state.board.player.get_triangles();
 
-    macro_rules! is_player_colliding {
-        ($player_triangles: expr) => {{
-            let mut is_colliding = false;
-            for pw in $player_triangles.windows(2) {
-                // TODO Use a spatial partition to reduce the amount of mountain lines
-                // we need to test.
-                for mw in state.board.triangles.windows(2) {
-                    is_colliding |= lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
-                    if is_colliding { break }
+    let bounce_vector = {
+        let mut bounce_vector = zo_xy!{0., 0.};
+        for pw in player_triangles_before_movement.windows(2) {
+            // TODO Use a spatial partition to reduce the amount of mountain lines
+            // we need to test.
+            for mw in state.board.triangles.windows(2) {
+                let is_colliding = lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
+
+                if is_colliding {
+                    // We want a vector that will separate the player from the
+                    // collison. Since the player will enter a collision edge first,
+                    // we point the vector towards the player's center.
+
+                    // That's one point for the line that we derive the vector from,
+                    // but we need another one. A natural other point for the vector
+                    // is the center of the colliding line.
+                    let line_center = zo_xy!{
+                        (pw[0].x.0 + pw[1].x.0) / 2.,
+                        (pw[0].y.0 + pw[1].y.0) / 2.,
+                    };
+
+                    // Because we know the center point of the player, we can get a
+                    // easily get a vector pointing from the `line_center` to the
+                    // player's center with simple subtraction:
+                    bounce_vector = state.board.player.xy - line_center;
+
+                    // We want the bounce to be forceful enough that the collision
+                    // stops, so we arbitrairaly scale it up to get that effect.
+                    // TODO Derive a value here in a principled way?
+                    bounce_vector *= 16.;
+
+                    break
                 }
             }
-            is_colliding
-        }}
-    }
-
-    let started_colliding = is_player_colliding!(player_triangles_before_movement);
-
-    let (player_triangles, is_colliding) = if started_colliding {
-        // Allow any non-downward movement when stuck.
-
-        state.board.player.xy += player_impulse * dt;
-        state.board.player.angle += PI * dt;
-
-        let player_triangles = state.board.player.get_triangles();
-
-        let is_colliding = is_player_colliding!(player_triangles);
-
-        (player_triangles, is_colliding)
-    } else {
-        let new_player = {
-            let mut new_player = state.board.player.clone();
-    
-            new_player.xy += player_impulse * dt;
-            new_player.angle += PI * dt;
-    
-            new_player
-        };
-
-        let player_triangles = new_player.get_triangles();
-
-        let is_colliding = is_player_colliding!(player_triangles);
-
-        if is_colliding {
-            // Don't allow moving if it would cause collision.
-            (player_triangles_before_movement, true)
-        } else {
-            state.board.player = new_player;
-            (player_triangles, false)
         }
+        bounce_vector
     };
+
+    let is_colliding = bounce_vector != zo_xy!{0., 0.};
+
+    player_impulse += bounce_vector;
+
+    state.board.player.xy += player_impulse * dt;
+    state.board.player.angle += PI * dt;
+
+    let player_triangles = state.board.player.get_triangles();
 
     //
     // Render
