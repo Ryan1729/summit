@@ -1124,10 +1124,156 @@ type Radians = f32;
 
 const PI: Radians = core::f32::consts::PI;
 
-#[derive(Debug, Default)]
+#[derive(Clone, Copy, Debug, Default)]
 struct Player {
     xy: zo::XY,
     angle: Radians,
+}
+
+impl Player {
+    fn get_triangles(&self) -> Triangles {
+        const LEG_WIDTH: f32 = 1./64.;//1024.;
+        const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
+        const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
+
+        const TORSO_HEIGHT: f32 = LEG_HEIGHT * 1.25;
+        const HEAD_HEIGHT: f32 = LEG_HEIGHT * 0.5;
+
+        const PLAYER_HEIGHT: f32 = LEG_HEIGHT + TORSO_HEIGHT + HEAD_HEIGHT;
+
+        // We set these offsets so that we can rotate around the player's center.
+        let x = 0.0;
+        let y = -PLAYER_HEIGHT / 2.;
+
+        let left_leg_min_x = x - (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
+        let left_leg_max_x = x - (BETWEEN_LEGS_HALF_WIDTH);
+
+        let right_leg_min_x = x + (BETWEEN_LEGS_HALF_WIDTH);
+        let right_leg_max_x = x + (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
+
+        let leg_max_y = y + LEG_HEIGHT;
+
+        // TODO avoid this per-frame allocation or merge it with others.
+        let mut player = Vec::with_capacity(64);
+
+        player.extend_from_slice(&[
+            // Left leg
+            zo_xy!{left_leg_min_x, y},
+            zo_xy!{left_leg_max_x, y},
+            zo_xy!{left_leg_min_x, leg_max_y},
+            zo_xy!{left_leg_max_x, leg_max_y},
+        ]);
+
+        // Right leg
+        push_dengenerate_to(
+            &mut player,
+            (
+                zo_xy!{right_leg_max_x, y},
+                zo_xy!{right_leg_min_x, y},
+            )
+        );
+        player.extend_from_slice(&[
+            zo_xy!{right_leg_max_x, y},
+            zo_xy!{right_leg_min_x, y},
+            zo_xy!{right_leg_max_x, leg_max_y},
+            zo_xy!{right_leg_min_x, leg_max_y},
+        ]);
+
+        // Might want an extended hip or something later.
+        let torso_min_x = left_leg_min_x;
+        let torso_min_y = leg_max_y;
+
+        let torso_max_x = right_leg_max_x;
+        let torso_max_y = torso_min_y + TORSO_HEIGHT;
+
+        // Torso
+        push_dengenerate_to(
+            &mut player,
+            (
+                zo_xy!{torso_min_x, torso_min_y},
+                zo_xy!{torso_max_x, torso_min_y},
+            )
+        );
+        player.extend_from_slice(&[
+            zo_xy!{torso_min_x, torso_min_y},
+            zo_xy!{torso_max_x, torso_min_y},
+            zo_xy!{torso_min_x, torso_max_y},
+            zo_xy!{torso_max_x, torso_max_y},
+        ]);
+
+        let head_min_x = left_leg_max_x;
+        let head_min_y = torso_max_y;
+
+        let head_max_x = right_leg_min_x;
+        let head_max_y = head_min_y + HEAD_HEIGHT;
+
+        let head_mid_x = (head_min_x + head_max_x) / 2.;
+        let head_mid_y = (head_min_y + head_max_y) / 2.;
+
+        let head_radius = head_max_x - head_mid_x;
+
+        // Head
+
+        // Based on https://stackoverflow.com/a/15296912
+        let mut angle = -PI/2.;
+        let step = PI/16.;
+        angle += step;
+
+        let head_point_1 = zo_xy!{head_min_x, head_mid_y};
+
+        // Pull an iteration out of th below loop so we have the first two points:
+        let (head_point_2, head_point_3) = {
+            let x = head_radius * angle.sin();
+            let y = head_radius * angle.cos();
+
+            angle += step;
+
+            (
+                zo_xy!{head_mid_x + x, head_mid_y + y},
+                zo_xy!{head_mid_x + x, head_mid_y - y},
+            )
+        };
+
+        push_dengenerate_to(
+            &mut player,
+            (
+                head_point_1,
+                head_point_2,
+            )
+        );
+
+        player.push(head_point_1);
+        player.push(head_point_2);
+        player.push(head_point_3);
+
+        while angle < PI/2. {
+            // TODO can we pull the trig functions out of the loop?
+            let x = head_radius * angle.sin();
+            let y = head_radius * angle.cos();
+
+            player.push(zo_xy!{head_mid_x + x, head_mid_y + y});
+            player.push(zo_xy!{head_mid_x + x, head_mid_y - y});
+
+            angle += step;
+        }
+
+        player.push(zo_xy!{head_max_x, head_mid_y});
+
+        let xy = self.xy;
+        let angle = self.angle;
+
+        let (sin_of, cos_of) = angle.sin_cos();
+
+        apply_transform(
+            &mut player,
+            [
+                cos_of, -sin_of, xy.x.0,
+                sin_of, cos_of, xy.y.0,
+            ]
+        );
+
+        player
+    }
 }
 
 #[derive(Debug, Default)]
@@ -1508,162 +1654,58 @@ pub fn update(
         player_impulse += cursor_zo_xy - state.board.player.xy;
     }
 
-    state.board.player.xy += player_impulse * dt;
-    state.board.player.angle += PI * dt;
+    let player_triangles_before_movement = state.board.player.get_triangles();
 
-    let player_triangles = {
-        const LEG_WIDTH: f32 = 1./64.;//1024.;
-        const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
-        const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
+    macro_rules! is_player_colliding {
+        ($player_triangles: expr) => {{
+            let mut is_colliding = false;
+            for pw in $player_triangles.windows(2) {
+                // TODO Use a spatial partition to reduce the amount of mountain lines
+                // we need to test.
+                for mw in state.board.triangles.windows(2) {
+                    is_colliding |= lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
+                    if is_colliding { break }
+                }
+            }
+            is_colliding
+        }}
+    }
 
-        const TORSO_HEIGHT: f32 = LEG_HEIGHT * 1.25;
-        const HEAD_HEIGHT: f32 = LEG_HEIGHT * 0.5;
+    let started_colliding = is_player_colliding!(player_triangles_before_movement);
 
-        const PLAYER_HEIGHT: f32 = LEG_HEIGHT + TORSO_HEIGHT + HEAD_HEIGHT;
+    let (player_triangles, is_colliding) = if started_colliding {
+        // Allow any non-downward movement when stuck.
 
-        // We set these offsets so that we can rotate around the player's center.
-        let x = 0.0;
-        let y = -PLAYER_HEIGHT / 2.;
+        state.board.player.xy += player_impulse * dt;
+        state.board.player.angle += PI * dt;
 
-        let left_leg_min_x = x - (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
-        let left_leg_max_x = x - (BETWEEN_LEGS_HALF_WIDTH);
+        let player_triangles = state.board.player.get_triangles();
 
-        let right_leg_min_x = x + (BETWEEN_LEGS_HALF_WIDTH);
-        let right_leg_max_x = x + (BETWEEN_LEGS_HALF_WIDTH + LEG_WIDTH);
+        let is_colliding = is_player_colliding!(player_triangles);
 
-        let leg_max_y = y + LEG_HEIGHT;
-
-        // TODO avoid this per-frame allocation or merge it with others.
-        let mut player = Vec::with_capacity(64);
-
-        player.extend_from_slice(&[
-            // Left leg
-            zo_xy!{left_leg_min_x, y},
-            zo_xy!{left_leg_max_x, y},
-            zo_xy!{left_leg_min_x, leg_max_y},
-            zo_xy!{left_leg_max_x, leg_max_y},
-        ]);
-
-        // Right leg
-        push_dengenerate_to(
-            &mut player,
-            (
-                zo_xy!{right_leg_max_x, y},
-                zo_xy!{right_leg_min_x, y},
-            )
-        );
-        player.extend_from_slice(&[
-            zo_xy!{right_leg_max_x, y},
-            zo_xy!{right_leg_min_x, y},
-            zo_xy!{right_leg_max_x, leg_max_y},
-            zo_xy!{right_leg_min_x, leg_max_y},
-        ]);
-
-        // Might want an extended hip or something later.
-        let torso_min_x = left_leg_min_x;
-        let torso_min_y = leg_max_y;
-
-        let torso_max_x = right_leg_max_x;
-        let torso_max_y = torso_min_y + TORSO_HEIGHT;
-
-        // Torso
-        push_dengenerate_to(
-            &mut player,
-            (
-                zo_xy!{torso_min_x, torso_min_y},
-                zo_xy!{torso_max_x, torso_min_y},
-            )
-        );
-        player.extend_from_slice(&[
-            zo_xy!{torso_min_x, torso_min_y},
-            zo_xy!{torso_max_x, torso_min_y},
-            zo_xy!{torso_min_x, torso_max_y},
-            zo_xy!{torso_max_x, torso_max_y},
-        ]);
-
-        let head_min_x = left_leg_max_x;
-        let head_min_y = torso_max_y;
-
-        let head_max_x = right_leg_min_x;
-        let head_max_y = head_min_y + HEAD_HEIGHT;
-
-        let head_mid_x = (head_min_x + head_max_x) / 2.;
-        let head_mid_y = (head_min_y + head_max_y) / 2.;
-
-        let head_radius = head_max_x - head_mid_x;
-
-        // Head
-
-        // Based on https://stackoverflow.com/a/15296912
-        let mut angle = -PI/2.;
-        let step = PI/16.;
-        angle += step;
-
-        let head_point_1 = zo_xy!{head_min_x, head_mid_y};
-
-        // Pull an iteration out of th below loop so we have the first two points:
-        let (head_point_2, head_point_3) = {
-            let x = head_radius * angle.sin();
-            let y = head_radius * angle.cos();
-
-            angle += step;
-
-            (
-                zo_xy!{head_mid_x + x, head_mid_y + y},
-                zo_xy!{head_mid_x + x, head_mid_y - y},
-            )
+        (player_triangles, is_colliding)
+    } else {
+        let new_player = {
+            let mut new_player = state.board.player.clone();
+    
+            new_player.xy += player_impulse * dt;
+            new_player.angle += PI * dt;
+    
+            new_player
         };
 
-        push_dengenerate_to(
-            &mut player,
-            (
-                head_point_1,
-                head_point_2,
-            )
-        );
+        let player_triangles = new_player.get_triangles();
 
-        player.push(head_point_1);
-        player.push(head_point_2);
-        player.push(head_point_3);
+        let is_colliding = is_player_colliding!(player_triangles);
 
-        while angle < PI/2. {
-            // TODO can we pull the trig functions out of the loop?
-            let x = head_radius * angle.sin();
-            let y = head_radius * angle.cos();
-
-            player.push(zo_xy!{head_mid_x + x, head_mid_y + y});
-            player.push(zo_xy!{head_mid_x + x, head_mid_y - y});
-
-            angle += step;
+        if is_colliding {
+            // Don't allow moving if it would cause collision.
+            (player_triangles_before_movement, true)
+        } else {
+            state.board.player = new_player;
+            (player_triangles, false)
         }
-
-        player.push(zo_xy!{head_max_x, head_mid_y});
-
-        let xy = state.board.player.xy;
-        let angle = state.board.player.angle;
-
-        let (sin_of, cos_of) = angle.sin_cos();
-
-        apply_transform(
-            &mut player,
-            [
-                cos_of, -sin_of, xy.x.0,
-                sin_of, cos_of, xy.y.0,
-            ]
-        );
-
-        player
     };
-
-    let mut is_colliding = false;
-    for pw in player_triangles.windows(2) {
-        // TODO Use a spatial partition to reduce the amount of mountain lines
-        // we need to test.
-        for mw in state.board.triangles.windows(2) {
-            is_colliding |= lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
-            if is_colliding { break }
-        }
-    }
 
     //
     // Render
