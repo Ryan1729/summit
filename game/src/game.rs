@@ -562,6 +562,9 @@ mod zo {
 
     #[macro_export]
     macro_rules! zo_xy {
+        () => {
+            zo_xy!{0., 0.}
+        };
         ($x: expr, $y: expr $(,)?) => {
             zo::XY {
                 x: zo::X(
@@ -1658,37 +1661,10 @@ pub fn update(
 
     let cursor_rel_xy = cursor_zo_xy - state.board.player.xy;
 
-    const GRAVITY: zo::XY = zo_xy!{0., -1./64.};
-
-    let mut player_impulse = GRAVITY;
-
-    if left_mouse_button_pressed {
-        const JUMP_SCALE: f32 = 16.;
-        player_impulse += (cursor_zo_xy - state.board.player.xy) * JUMP_SCALE;
-    }
-
-    let mut arrow_impulse = match input {
-        NoChange | Interact => zo_xy!{0., 0.},
-        Dir(Up) => zo_xy!{0., 1.},
-        // TODO sqrt(2)?
-        Dir(UpRight) => zo_xy!{1., 1.},
-        Dir(Right) => zo_xy!{1., 0.},
-        Dir(DownRight) => zo_xy!{1., -1.},
-        Dir(Down) => zo_xy!{0., -1.},
-        Dir(DownLeft) => zo_xy!{-1., -1.},
-        Dir(Left) => zo_xy!{-1., 0.},
-        Dir(UpLeft) => zo_xy!{-1., 1.},
-    };
-
-    const ARROW_SCALE: f32 = 1./128.;
-    arrow_impulse *= ARROW_SCALE;
-
-    player_impulse += arrow_impulse;
-
     let player_triangles_before_movement = state.board.player.get_triangles();
 
     let bounce_vector = {
-        let mut bounce_vector = zo_xy!{0., 0.};
+        let mut bounce_vector = zo_xy!{};
         for pw in player_triangles_before_movement.windows(2) {
             // TODO Use a spatial partition to reduce the amount of mountain lines
             // we need to test.
@@ -1725,14 +1701,45 @@ pub fn update(
         bounce_vector
     };
 
-    let is_colliding = bounce_vector != zo_xy!{0., 0.};
+    let is_colliding = bounce_vector != zo_xy!{};
+
+    const GRAVITY: zo::XY = zo_xy!{0., -1./64.};
+
+    let mut player_impulse = GRAVITY;
+
+    if left_mouse_button_pressed && !is_colliding {
+        const JUMP_SCALE: f32 = 16.;
+        player_impulse += (cursor_zo_xy - state.board.player.xy) * JUMP_SCALE;
+    }
+
+    let mut arrow_impulse = match input {
+        NoChange | Interact => zo_xy!{},
+        Dir(Up) => zo_xy!{0., 1.},
+        // TODO sqrt(2)?
+        Dir(UpRight) => zo_xy!{1., 1.},
+        Dir(Right) => zo_xy!{1., 0.},
+        Dir(DownRight) => zo_xy!{1., -1.},
+        Dir(Down) => zo_xy!{0., -1.},
+        Dir(DownLeft) => zo_xy!{-1., -1.},
+        Dir(Left) => zo_xy!{-1., 0.},
+        Dir(UpLeft) => zo_xy!{-1., 1.},
+    };
+
+    const ARROW_SCALE: f32 = 1./128.;
+    arrow_impulse *= ARROW_SCALE;
+
+    player_impulse += arrow_impulse;
 
     player_impulse += bounce_vector;
+
+    if is_colliding {
+        state.board.player.velocity = zo_xy!{};
+    }
 
     state.board.player.velocity += player_impulse * dt;
     state.board.player.xy += state.board.player.velocity * dt;
 
-    if left_mouse_button_down {
+    if left_mouse_button_down && !is_colliding {
         state.board.player.angle += PI * dt;
     }
 
