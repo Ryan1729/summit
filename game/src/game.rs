@@ -1128,6 +1128,7 @@ const PI: Radians = core::f32::consts::PI;
 struct Player {
     xy: zo::XY,
     angle: Radians,
+    velocity: zo::XY,
 }
 
 impl Player {
@@ -1427,8 +1428,8 @@ impl Board {
             player: Player {
                 // Something non-default for inital testing
                 xy: zo_xy!{0., summit.y.0},
-                angle: PI,
-            }, // <_>::default(),
+                ..<_>::default()
+            },
         }
     }
 }
@@ -1552,6 +1553,17 @@ pub fn update(
 
     let left_mouse_button_down = input_flags & INPUT_LEFT_MOUSE_DOWN != 0;
 
+    let left_mouse_button_pressed =
+        input_flags & INPUT_LEFT_MOUSE_CHANGED != 0
+        && left_mouse_button_down;
+    let left_mouse_button_released =
+        input_flags & INPUT_LEFT_MOUSE_CHANGED != 0
+        && !left_mouse_button_down;
+
+    assert!(
+        !(left_mouse_button_pressed && left_mouse_button_released)
+    );
+
     let input = Input::from_flags(input_flags);
 
     use EyeState::*;
@@ -1650,9 +1662,28 @@ pub fn update(
 
     let mut player_impulse = GRAVITY;
 
-    if left_mouse_button_down {
-        player_impulse += cursor_zo_xy - state.board.player.xy;
+    if left_mouse_button_pressed {
+        const JUMP_SCALE: f32 = 16.;
+        player_impulse += (cursor_zo_xy - state.board.player.xy) * JUMP_SCALE;
     }
+
+    let mut arrow_impulse = match input {
+        NoChange | Interact => zo_xy!{0., 0.},
+        Dir(Up) => zo_xy!{0., 1.},
+        // TODO sqrt(2)?
+        Dir(UpRight) => zo_xy!{1., 1.},
+        Dir(Right) => zo_xy!{1., 0.},
+        Dir(DownRight) => zo_xy!{1., -1.},
+        Dir(Down) => zo_xy!{0., -1.},
+        Dir(DownLeft) => zo_xy!{-1., -1.},
+        Dir(Left) => zo_xy!{-1., 0.},
+        Dir(UpLeft) => zo_xy!{-1., 1.},
+    };
+
+    const ARROW_SCALE: f32 = 1./128.;
+    arrow_impulse *= ARROW_SCALE;
+
+    player_impulse += arrow_impulse;
 
     let player_triangles_before_movement = state.board.player.get_triangles();
 
@@ -1698,8 +1729,12 @@ pub fn update(
 
     player_impulse += bounce_vector;
 
-    state.board.player.xy += player_impulse * dt;
-    state.board.player.angle += PI * dt;
+    state.board.player.velocity += player_impulse * dt;
+    state.board.player.xy += state.board.player.velocity * dt;
+
+    if left_mouse_button_down {
+        state.board.player.angle += PI * dt;
+    }
 
     let player_triangles = state.board.player.get_triangles();
 
