@@ -1137,7 +1137,7 @@ struct Player {
 const PLAYER_SCALE: f32 = 1./64.;//1024.;
 
 impl Player {
-    fn get_triangles(&self) -> Triangles {
+    fn get_triangles_and_transform(&self) -> (Triangles, Transform) {
         const LEG_WIDTH: f32 = PLAYER_SCALE;
         const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
         const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
@@ -1270,15 +1270,13 @@ impl Player {
 
         let (sin_of, cos_of) = angle.sin_cos();
 
-        apply_transform(
-            &mut player,
+        (
+            player,
             [
                 cos_of, -sin_of, xy.x.0,
                 sin_of, cos_of, xy.y.0,
             ]
-        );
-
-        player
+        )
     }
 }
 
@@ -1683,7 +1681,16 @@ pub fn update(
 
     let cursor_rel_xy = cursor_zo_xy - state.board.player.xy;
 
-    let player_triangles_before_movement = state.board.player.get_triangles();
+    let player_triangles_before_movement = {
+        let (mut triangles, transform) = state.board.player.get_triangles_and_transform();
+
+        apply_transform(
+            &mut triangles,
+            transform
+        );
+
+        triangles
+    };
 
     let bounce_vector = {
         let mut bounce_vector = zo_xy!{};
@@ -1765,7 +1772,7 @@ pub fn update(
         state.board.player.angle += PI * dt;
     }
 
-    let player_triangles = state.board.player.get_triangles();
+    let (player_triangles, player_transform) = state.board.player.get_triangles_and_transform();
 
     //
     // Render
@@ -1866,7 +1873,10 @@ pub fn update(
 
     commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
 
-    commands.push(TriangleStrip(convert_strip!(player_triangles), draw::Colour::Stone));
+    commands.push(TriangleStrip(
+        convert_strip!(player_triangles, player_transform),
+        draw::Colour::Stone
+    ));
 
     fn move_along_angle_with_pre_sin_cos(
         (sin, cos): (Radians, Radians),
@@ -1890,7 +1900,7 @@ pub fn update(
         zo_xy!{x, y}
     }
 
-    let jump_arrow = {
+    let (jump_arrow, jump_arrow_transform) = {
         const JUMP_ARROW_HALF_W: f32 = PLAYER_SCALE;
         const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W * 2.;
 
@@ -1900,7 +1910,7 @@ pub fn update(
         const JUMP_ARROW_MIN_Y: f32 = -JUMP_ARROW_HALF_H;
         const JUMP_ARROW_MAX_Y: f32 = JUMP_ARROW_HALF_H;
 
-        let mut arrow = vec![
+        let arrow = vec![
             zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MAX_Y },
             zo_xy!{ 0.0, 0.0 },
             zo_xy!{ JUMP_ARROW_MAX_X, 0.0 },
@@ -1922,18 +1932,19 @@ pub fn update(
         let x = xy.x.0;
         let y = xy.y.0;
 
-        apply_transform(
-            &mut arrow,
+        (
+            arrow,
             [
                 cos_of, -sin_of, x,
                 sin_of, cos_of, y,
-            ]
-        );
-
-        arrow
+            ],
+        )
     };
 
-    commands.push(TriangleStrip(convert_strip!(jump_arrow), draw::Colour::Arrow));
+    commands.push(TriangleStrip(
+        convert_strip!(jump_arrow, jump_arrow_transform),
+        draw::Colour::Arrow
+    ));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
