@@ -1134,9 +1134,11 @@ struct Player {
     velocity: zo::XY,
 }
 
+const PLAYER_SCALE: f32 = 1./1024.;
+
 impl Player {
     fn get_triangles(&self) -> Triangles {
-        const LEG_WIDTH: f32 = 1./64.;//1024.;
+        const LEG_WIDTH: f32 = PLAYER_SCALE;
         const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
         const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
 
@@ -1429,8 +1431,7 @@ impl Board {
             triangles,
             summit,
             player: Player {
-                // Something non-default for inital testing
-                xy: zo_xy!{0., summit.y.0},
+                xy: zo_xy!{0., 1./64.},
                 ..<_>::default()
             },
         }
@@ -1703,12 +1704,12 @@ pub fn update(
 
     let is_colliding = bounce_vector != zo_xy!{};
 
-    const GRAVITY: zo::XY = zo_xy!{0., -1./64.};
+    const GRAVITY: zo::XY = zo_xy!{0., -1. * PLAYER_SCALE};
 
     let mut player_impulse = GRAVITY;
 
     if left_mouse_button_pressed && !is_colliding {
-        const JUMP_SCALE: f32 = 16.;
+        const JUMP_SCALE: f32 = 1024. * PLAYER_SCALE;
         player_impulse += (cursor_zo_xy - state.board.player.xy) * JUMP_SCALE;
     }
 
@@ -1725,7 +1726,7 @@ pub fn update(
         Dir(UpLeft) => zo_xy!{-1., 1.},
     };
 
-    const ARROW_SCALE: f32 = 1./128.;
+    const ARROW_SCALE: f32 = 1./128. * PLAYER_SCALE;
     arrow_impulse *= ARROW_SCALE;
 
     player_impulse += arrow_impulse;
@@ -1782,7 +1783,7 @@ pub fn update(
     let summit_xy = state.board.summit;
 
     const POLE_HALF_W: f32 = 1./1024.;
-    const POLE_H: f32 = POLE_HALF_W * 32.;//8.;
+    const POLE_H: f32 = POLE_HALF_W * 8.;
 
     let pole_top_y = summit_xy.y.0 + POLE_H;
     let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
@@ -1845,7 +1846,7 @@ pub fn update(
     }
 
     let jump_arrow = {
-        const JUMP_ARROW_HALF_W: f32 = 1./32.;//1024.;
+        const JUMP_ARROW_HALF_W: f32 = PLAYER_SCALE;
         const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W * 2.;
 
         const JUMP_ARROW_MIN_X: f32 = -JUMP_ARROW_HALF_W;
