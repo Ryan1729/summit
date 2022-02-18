@@ -1134,7 +1134,7 @@ struct Player {
     velocity: zo::XY,
 }
 
-const PLAYER_SCALE: f32 = 1./1024.;
+const PLAYER_SCALE: f32 = 1./64.;//1024.;
 
 impl Player {
     fn get_triangles(&self) -> Triangles {
@@ -1431,7 +1431,7 @@ impl Board {
             triangles,
             summit,
             player: Player {
-                xy: zo_xy!{0., 1./64.},
+                xy: zo_xy!{0., 8. * PLAYER_SCALE},
                 ..<_>::default()
             },
         }
@@ -1766,11 +1766,29 @@ pub fn update(
         xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
     }));
 
-    // TODO avoid this per-frame allocation or merge it with others.
-    let mountain: draw::TriangleStrip = state.board.triangles
-        .iter()
-        .map(|xy| zo_to_draw_xy(&state.sizes, *xy))
-        .collect();
+    macro_rules! convert_strip {
+        ($strip: expr) => {{
+            let mut strip = $strip;
+
+            apply_transform(
+                &mut strip,
+                [
+                    1., 0., -(state.board.player.xy.x.0 - 0.5),
+                    0., 1., -(state.board.player.xy.y.0 - 0.5),
+                ]
+            );
+
+            strip
+                .into_iter()
+                .map(|xy| zo_to_draw_xy(&state.sizes, xy))
+                .collect()
+        }}
+    }
+
+    let mountain: draw::TriangleStrip = 
+        convert_strip!(
+            state.board.triangles.clone()
+        );
 
     let mountain_colour = if is_colliding {
         draw::Colour::Pole
@@ -1796,15 +1814,6 @@ pub fn update(
         zo_xy!{ pole_min_x, pole_top_y },
         zo_xy!{ pole_max_x, pole_top_y },
     ];
-
-    macro_rules! convert_strip {
-        ($strip: expr) => {
-            $strip
-                .into_iter()
-                .map(|xy| zo_to_draw_xy(&state.sizes, xy))
-                .collect()
-        }
-    }
 
     commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
 
