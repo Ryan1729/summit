@@ -1770,6 +1770,16 @@ pub fn update(
         ($strip: expr) => {{
             let mut strip = $strip;
 
+            /*let camera_scale: f32 = 2.;//state.sizes.play_xywh.w / 256.;
+
+            apply_transform(
+                &mut strip,
+                [
+                    camera_scale, 0., 0.,
+                    0., camera_scale, 0.,
+                ]
+            );*/
+
             apply_transform(
                 &mut strip,
                 [
