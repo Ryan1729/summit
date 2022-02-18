@@ -1270,12 +1270,16 @@ impl Player {
 
         let (sin_of, cos_of) = angle.sin_cos();
 
+        let transform = [
+            cos_of, -sin_of, xy.x.0,
+            sin_of, cos_of, xy.y.0,
+        ];
+
+        //apply_transform(&mut player, transform);
+
         (
             player,
-            [
-                cos_of, -sin_of, xy.x.0,
-                sin_of, cos_of, xy.y.0,
-            ]
+            transform,//IDENTITY_TRANSFORM,
         )
     }
 }
@@ -1477,13 +1481,13 @@ const IDENTITY_TRANSFORM: Transform = [
 /// AKA: t2 matrix multiplied by t1
 fn merge_transforms(t1: Transform, t2: Transform) -> Transform {
     [
-        t1[0] * t2[0] + t1[1] * t2[3] /* + t1[2] * 0. */,
-        t1[0] * t2[1] + t1[1] * t2[4] /* + t1[2] * 0. */,
-        t1[0] * t2[2] + t1[1] * t2[5] + t1[2] /* * 1. */,
+        t2[0] * t1[0] + t2[1] * t1[3] /* + t2[2] * 0. */,
+        t2[0] * t1[1] + t2[1] * t1[4] /* + t2[2] * 0. */,
+        t2[0] * t1[2] + t2[1] * t1[5] + t2[2] /* * 1. */,
 
-        t1[3] * t2[0] + t1[4] * t2[3] /* + t1[5] * 0. */,
-        t1[3] * t2[1] + t1[4] * t2[4] /* + t1[5] * 0. */,
-        t1[3] * t2[2] + t1[4] * t2[5] + t1[5] /* * 1. */,
+        t2[3] * t1[0] + t2[4] * t1[3] /* + t2[5] * 0. */,
+        t2[3] * t1[1] + t2[4] * t1[4] /* + t2[5] * 0. */,
+        t2[3] * t1[2] + t2[4] * t1[5] + t2[5] /* * 1. */,
     ]
 }
 
@@ -1932,12 +1936,19 @@ pub fn update(
         let x = xy.x.0;
         let y = xy.y.0;
 
+        let transform = [
+            cos_of, -sin_of, x,
+            sin_of, cos_of, y,
+        ];
+
+        /*apply_transform(
+            &mut arrow,
+            transform,
+        );*/
+
         (
             arrow,
-            [
-                cos_of, -sin_of, x,
-                sin_of, cos_of, y,
-            ],
+            transform//IDENTITY_TRANSFORM,
         )
     };
 
