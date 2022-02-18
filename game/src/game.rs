@@ -1468,6 +1468,27 @@ pub fn sizes(state: &State) -> draw::Sizes {
 /// of `0 0 1` left implicit.
 type Transform = [f32; 6];
 
+const IDENTITY_TRANSFORM: Transform = [
+    1., 0., 0.,
+    0., 1., 0.,
+  /*0., 0., 1.,*/
+];
+
+/// Combine two transforms into a single transform that when applied to a point will
+/// apply t1 then t2.
+/// AKA: t2 matrix multiplied by t1
+fn merge_transforms(t1: Transform, t2: Transform) -> Transform {
+    [
+        t1[0] * t2[0] + t1[1] * t2[3] /* + t1[2] * 0. */,
+        t1[0] * t2[1] + t1[1] * t2[4] /* + t1[2] * 0. */,
+        t1[0] * t2[2] + t1[1] * t2[5] + t1[2] /* * 1. */,
+
+        t1[3] * t2[0] + t1[4] * t2[3] /* + t1[5] * 0. */,
+        t1[3] * t2[1] + t1[4] * t2[4] /* + t1[5] * 0. */,
+        t1[3] * t2[2] + t1[4] * t2[5] + t1[5] /* * 1. */,
+    ]
+}
+
 fn apply_transform(xys: &mut [zo::XY], transform: Transform) {
     for xy in xys.iter_mut() {
         *xy = zo_xy!{
@@ -1768,6 +1789,9 @@ pub fn update(
 
     macro_rules! convert_strip {
         ($strip: expr) => {{
+            convert_strip!($strip, IDENTITY_TRANSFORM)
+        }};
+        ($strip: expr, $transform: expr) => {{
             let mut strip = $strip;
 
             /*let camera_scale: f32 = 2.;//state.sizes.play_xywh.w / 256.;
@@ -1780,13 +1804,15 @@ pub fn update(
                 ]
             );*/
 
-            apply_transform(
-                &mut strip,
+            let t = merge_transforms(
+                $transform,
                 [
                     1., 0., -(state.board.player.xy.x.0 - 0.5),
                     0., 1., -(state.board.player.xy.y.0 - 0.5),
-                ]
+                ],
             );
+
+            apply_transform(&mut strip, t);
 
             strip
                 .into_iter()
