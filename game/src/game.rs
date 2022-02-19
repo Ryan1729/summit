@@ -1,4 +1,4 @@
-#![deny(unused)]
+#![allow(unused)]
 #![deny(bindings_with_variant_name)]
 
 #[allow(unused)]
@@ -1611,8 +1611,10 @@ pub fn update(
     state: &mut State,
     commands: &mut dyn ClearableStorage<draw::Command>,
     input_flags: InputFlags,
+    #[allow(unused)]
     cursor_xy: CursorXY,
     draw_wh: DrawWH,
+    #[allow(unused)]
     dt: DeltaTimeInSeconds
 ) {
     use draw::{TextSpec, TextKind, Command::*};
@@ -1638,295 +1640,58 @@ pub fn update(
 
     let input = Input::from_flags(input_flags);
 
-    use EyeState::*;
-    use Input::*;
-    use crate::Dir::*;
-
-    const HOLD_FRAMES: AnimationTimer = 30;
-
-    match input {
-        NoChange => match state.board.eye.state {
-            Idle => {
-                if state.animation_timer % (HOLD_FRAMES * 3) == 0 {
-                    state.board.eye.state = NarrowAnimCenter;
-                }
-            },
-            Moved(_) => {
-                if state.animation_timer % HOLD_FRAMES == 0 {
-                    state.board.eye.state = Idle;
-                }
-            },
-            SmallPupil => {
-                if state.animation_timer % (HOLD_FRAMES * 3) == 0 {
-                    state.board.eye.state = Closed;
-                }
-            },
-            Closed => {
-                if state.animation_timer % (HOLD_FRAMES) == 0 {
-                    state.board.eye.state = HalfLid;
-                }
-            },
-            HalfLid => {
-                if state.animation_timer % (HOLD_FRAMES * 5) == 0 {
-                    state.board.eye.state = Idle;
-                }
-            },
-            NarrowAnimCenter => {
-                let modulus = state.animation_timer % (HOLD_FRAMES * 4);
-                if modulus == 0 {
-                    state.board.eye.state = NarrowAnimRight;
-                } else if modulus == HOLD_FRAMES * 2 {
-                    state.board.eye.state = NarrowAnimLeft;
-                }
-            },
-            NarrowAnimLeft | NarrowAnimRight => {
-                if state.animation_timer % HOLD_FRAMES == 0 {
-                    state.board.eye.state = NarrowAnimCenter;
-                }
-            },
-        },
-        Dir(Up) => {
-            state.board.eye.state = Moved(Up);
-            state.board.eye.xy.move_up();
-        },
-        Dir(UpRight) => {
-            state.board.eye.state = Moved(UpRight);
-            state.board.eye.xy.move_up();
-            state.board.eye.xy.move_right();
-        },
-        Dir(Right) => {
-            state.board.eye.state = Moved(Right);
-            state.board.eye.xy.move_right();
-        },
-        Dir(DownRight) => {
-            state.board.eye.state = Moved(DownRight);
-            state.board.eye.xy.move_down();
-            state.board.eye.xy.move_right();
-        },
-        Dir(Down) => {
-            state.board.eye.state = Moved(Down);
-            state.board.eye.xy.move_down();
-        },
-        Dir(DownLeft) => {
-            state.board.eye.state = Moved(DownLeft);
-            state.board.eye.xy.move_down();
-            state.board.eye.xy.move_left();
-        },
-        Dir(Left) => {
-            state.board.eye.state = Moved(Left);
-            state.board.eye.xy.x = state.board.eye.xy.x.saturating_sub_one();
-        },
-        Dir(UpLeft) => {
-            state.board.eye.state = Moved(UpLeft);
-            state.board.eye.xy.move_up();
-            state.board.eye.xy.move_left();
-        },
-        Interact => {
-            state.board.eye.state = SmallPupil;
-        },
-    }
-
-    let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
-
-    let cursor_rel_xy = cursor_zo_xy - state.board.player.xy;
-
-    let player_triangles_before_movement = {
-        let (mut triangles, transform) = state.board.player.get_triangles_and_transform();
-
-        apply_transform(
-            &mut triangles,
-            transform
-        );
-
-        triangles
-    };
-
-    let bounce_vector = {
-        let mut bounce_vector = zo_xy!{};
-        for pw in player_triangles_before_movement.windows(2) {
-            // TODO Use a spatial partition to reduce the amount of mountain lines
-            // we need to test.
-            for mw in state.board.triangles.windows(2) {
-                let is_colliding = lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
-
-                if is_colliding {
-                    // We want a vector that will separate the player from the
-                    // collison. Since the player will enter a collision edge first,
-                    // we point the vector towards the player's center.
-
-                    // That's one point for the line that we derive the vector from,
-                    // but we need another one. A natural other point for the vector
-                    // is the center of the colliding line.
-                    let line_center = zo_xy!{
-                        (pw[0].x.0 + pw[1].x.0) / 2.,
-                        (pw[0].y.0 + pw[1].y.0) / 2.,
-                    };
-
-                    // Because we know the center point of the player, we can get a
-                    // easily get a vector pointing from the `line_center` to the
-                    // player's center with simple subtraction:
-                    bounce_vector = state.board.player.xy - line_center;
-
-                    // We want the bounce to be forceful enough that the collision
-                    // stops, so we arbitrairaly scale it up to get that effect.
-                    // TODO Derive a value here in a principled way?
-                    bounce_vector *= 16.;
-
-                    break
-                }
-            }
-        }
-        bounce_vector
-    };
-
-    let is_colliding = bounce_vector != zo_xy!{};
-
-    const GRAVITY: zo::XY = zo_xy!{0., -1. * PLAYER_SCALE};
-
-    let mut player_impulse = GRAVITY;
-
-    if left_mouse_button_pressed && !is_colliding {
-        const JUMP_SCALE: f32 = 1024. * PLAYER_SCALE;
-        player_impulse += (cursor_zo_xy - state.board.player.xy) * JUMP_SCALE;
-    }
-
-    let mut arrow_impulse = match input {
-        NoChange | Interact => zo_xy!{},
-        Dir(Up) => zo_xy!{0., 1.},
-        // TODO sqrt(2)?
-        Dir(UpRight) => zo_xy!{1., 1.},
-        Dir(Right) => zo_xy!{1., 0.},
-        Dir(DownRight) => zo_xy!{1., -1.},
-        Dir(Down) => zo_xy!{0., -1.},
-        Dir(DownLeft) => zo_xy!{-1., -1.},
-        Dir(Left) => zo_xy!{-1., 0.},
-        Dir(UpLeft) => zo_xy!{-1., 1.},
-    };
-
-    const ARROW_SCALE: f32 = 1./128. * PLAYER_SCALE;
-    arrow_impulse *= ARROW_SCALE;
-
-    player_impulse += arrow_impulse;
-
-    player_impulse += bounce_vector;
-
-    if is_colliding {
-        state.board.player.velocity = zo_xy!{};
-    }
-
-    state.board.player.velocity += player_impulse * dt;
-    state.board.player.xy += state.board.player.velocity * dt;
-
-    if left_mouse_button_down && !is_colliding {
-        state.board.player.angle += PI * dt;
-    }
-
-    let (player_triangles, player_transform) = state.board.player.get_triangles_and_transform();
-
     //
     // Render
     //
 
-    for i in 0..TILES_LENGTH {
-        let tile_data = state.board.tiles.tiles[i];
+    const LINE_THICKNESS: f32 = 1./8.;
 
-        let txy = tile::i_to_xy(i);
+    // We draw an F because it is asymmetric enough that we can tell if it has been
+    // flipped or rotated.
 
-        commands.push(Sprite(SpriteSpec{
-            sprite: tile_data.sprite(),
-            xy: draw_xy_from_tile(&state.sizes, txy),
-        }));
-    }
+    // --- <- Arm
+    // |
+    // --  <- Bar
+    // |
+    //
+    // (not to scale)
 
-    commands.push(Sprite(SpriteSpec{
-        sprite: state.board.eye.state.sprite(),
-        xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
-    }));
+    const BAR_MAX_X: f32 = 0.5 + LINE_THICKNESS;
 
-    macro_rules! convert_strip {
-        ($strip: expr) => {{
-            convert_strip!($strip, IDENTITY_TRANSFORM)
-        }};
-        ($strip: expr, $transform: expr) => {{
-            let mut strip = $strip;
+    const BAR_MIN_Y: f32 = 0.5 - LINE_THICKNESS * 0.5;
+    const BAR_MAX_Y: f32 = BAR_MIN_Y + LINE_THICKNESS;
 
-            /*let camera_scale: f32 = 2.;//state.sizes.play_xywh.w / 256.;
+    const ARM_MAX_X: f32 = 1.;
 
-            apply_transform(
-                &mut strip,
-                [
-                    camera_scale, 0., 0.,
-                    0., camera_scale, 0.,
-                ]
-            );*/
+    const ARM_MAX_Y: f32 = 1.;
+    const ARM_MIN_Y: f32 = ARM_MAX_Y - LINE_THICKNESS;
 
-            let t = merge_transforms(
-                $transform,
-                [
-                    1., 0., -(state.board.player.xy.x.0 - 0.5),
-                    0., 1., -(state.board.player.xy.y.0 - 0.5),
-                ],
-            );
+    const F: [zo::XY; 15] = [
+        zo_xy!{ LINE_THICKNESS, 0. },
+        zo_xy!{ LINE_THICKNESS, BAR_MIN_Y },        
+        zo_xy!{},
+        zo_xy!{ 0., BAR_MIN_Y },
+        zo_xy!{ 0., BAR_MAX_Y },
+        zo_xy!{ BAR_MAX_X, BAR_MIN_Y },
+        zo_xy!{ BAR_MAX_X, BAR_MAX_Y },
+        // Degenerate Triangle
+        zo_xy!{ LINE_THICKNESS, BAR_MAX_Y },
+        zo_xy!{ LINE_THICKNESS, BAR_MAX_Y },
+        //
+        zo_xy!{ LINE_THICKNESS, ARM_MIN_Y },
+        zo_xy!{ 0., BAR_MAX_Y },
+        zo_xy!{ 0., ARM_MIN_Y },
+        zo_xy!{ 0., ARM_MAX_Y },
+        zo_xy!{ ARM_MAX_X, ARM_MIN_Y },
+        zo_xy!{ ARM_MAX_X, ARM_MAX_Y },
+    ];
 
-            apply_transform(&mut strip, t);
-
-            strip
+    commands.push(TriangleStrip(F
                 .into_iter()
                 .map(|xy| zo_to_draw_xy(&state.sizes, xy))
-                .collect()
-        }}
-    }
+                .collect(), draw::Colour::Pole));
 
-    let mountain: draw::TriangleStrip = 
-        convert_strip!(
-            state.board.triangles.clone()
-        );
-
-    let mountain_colour = if is_colliding {
-        draw::Colour::Pole
-    } else {
-        draw::Colour::Stone
-    };
-
-    commands.push(TriangleStrip(mountain, mountain_colour));
-
-    let summit_xy = state.board.summit;
-
-    const POLE_HALF_W: f32 = 1./1024.;
-    const POLE_H: f32 = POLE_HALF_W * 8.;
-
-    let pole_top_y = summit_xy.y.0 + POLE_H;
-    let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
-    let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
-
-    // TODO avoid this per-frame allocation or merge it with others.
-    let pole = vec![
-        zo_xy!{ pole_min_x, summit_xy.y.0 },
-        zo_xy!{ pole_max_x, summit_xy.y.0 },
-        zo_xy!{ pole_min_x, pole_top_y },
-        zo_xy!{ pole_max_x, pole_top_y },
-    ];
-
-    commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
-
-    const FLAG_H: f32 = POLE_H / 4.;
-    const FLAG_W: f32 = FLAG_H;
-
-    // TODO Animate the flag blowing in the wind.
-
-    let flag = vec![
-        zo_xy!{ pole_max_x, pole_top_y },
-        zo_xy!{ pole_max_x, pole_top_y - FLAG_H },
-        zo_xy!{ pole_max_x + FLAG_W, pole_top_y - FLAG_H / 2. },
-    ];
-
-    commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
-
-    commands.push(TriangleStrip(
-        convert_strip!(player_triangles, player_transform),
-        draw::Colour::Stone
-    ));
-
+    #[allow(unused)]
     fn move_along_angle_with_pre_sin_cos(
         (sin, cos): (Radians, Radians),
         radius: f32,
@@ -1948,59 +1713,6 @@ pub fn update(
 
         zo_xy!{x, y}
     }
-
-    let (jump_arrow, jump_arrow_transform) = {
-        const JUMP_ARROW_HALF_W: f32 = PLAYER_SCALE;
-        const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W * 2.;
-
-        const JUMP_ARROW_MIN_X: f32 = -JUMP_ARROW_HALF_W;
-        const JUMP_ARROW_MAX_X: f32 = JUMP_ARROW_HALF_W;
-
-        const JUMP_ARROW_MIN_Y: f32 = -JUMP_ARROW_HALF_H;
-        const JUMP_ARROW_MAX_Y: f32 = JUMP_ARROW_HALF_H;
-
-        let arrow = vec![
-            zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MAX_Y },
-            zo_xy!{ 0.0, 0.0 },
-            zo_xy!{ JUMP_ARROW_MAX_X, 0.0 },
-            zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MIN_Y },
-        ];
-
-        let angle = f32::atan2(cursor_rel_xy.y.0, cursor_rel_xy.x.0);
-
-        const ARROW_RADIUS: f32 = JUMP_ARROW_HALF_W * 8.;
-
-        let (sin_of, cos_of) = angle.sin_cos();
-
-        let xy = move_along_angle_with_pre_sin_cos(
-            (sin_of, cos_of),
-            ARROW_RADIUS,
-            state.board.player.xy,
-        );
-
-        let x = xy.x.0;
-        let y = xy.y.0;
-
-        let transform = [
-            cos_of, -sin_of, x,
-            sin_of, cos_of, y,
-        ];
-
-        /*apply_transform(
-            &mut arrow,
-            transform,
-        );*/
-
-        (
-            arrow,
-            transform//IDENTITY_TRANSFORM,
-        )
-    };
-
-    commands.push(TriangleStrip(
-        convert_strip!(jump_arrow, jump_arrow_transform),
-        draw::Colour::Arrow
-    ));
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
@@ -2028,9 +1740,8 @@ pub fn update(
 
         commands.push(Text(TextSpec{
             text: format!(
-                "sizes: {:?}\nanimation_timer: {:?}",
+                "sizes: {:?}",
                 state.sizes,
-                state.animation_timer
             ),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
