@@ -1504,6 +1504,51 @@ fn apply_transform(xys: &mut [zo::XY], transform: Transform) {
     }
 }
 
+#[cfg(test)]
+mod merge_transforms_then_apply_is_equivalent_to_sequential_applies {
+    use super::*;
+
+    #[test]
+    fn on_this_example() {
+        let t1 = [
+            1., 2., 3.,
+            4., 5., 6.,
+        ];
+
+        let t2 = [
+            7., 8., 9.,
+            0., 1., 2.,
+        ];
+
+        let merged = merge_transforms(t1, t2);
+
+        macro_rules! a {
+            ($($token: tt)*) => {{
+                let point = zo_xy!{$($token)*};
+
+                let mut merged_point_array = [point];
+
+                apply_transform(&mut merged_point_array, merged);
+
+                let mut sequential_point_array = [point];
+
+                apply_transform(&mut sequential_point_array, t1);
+                apply_transform(&mut sequential_point_array, t2);
+
+                assert_eq!(merged_point_array, sequential_point_array);
+            }}
+        }
+
+        a!();
+        a!(1., 1.);
+        a!(1., 2.);
+        a!(1., -2.);
+        a!(-1., 2.);
+        a!(-1., -2.);
+        a!(std::f32::consts::PI, 1./std::f32::consts::PI);
+    }
+}
+
 pub type InputFlags = u16;
 
 pub const INPUT_UP_PRESSED: InputFlags              = 0b0000_0000_0000_0001;
