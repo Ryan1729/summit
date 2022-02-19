@@ -1284,13 +1284,14 @@ impl Player {
     }
 }
 
+type Kind = u8;
+
 #[derive(Debug, Default)]
 struct Board {
     tiles: Tiles,
     eye: Eye,
     triangles: Triangles,
-    summit: zo::XY,
-    player: Player,
+    kind: Kind,
 }
 
 impl Board {
@@ -1431,11 +1432,7 @@ impl Board {
                 ..<_>::default()
             },
             triangles,
-            summit,
-            player: Player {
-                xy: zo_xy!{0., 8. * PLAYER_SCALE},
-                ..<_>::default()
-            },
+            ..<_>::default()
         }
     }
 }
@@ -1451,6 +1448,7 @@ pub struct State {
     sizes: draw::Sizes,
     board: Board,
     animation_timer: AnimationTimer
+
 }
 
 impl State {
@@ -1640,6 +1638,15 @@ pub fn update(
 
     let input = Input::from_flags(input_flags);
 
+    use Input::*;
+    use crate::Dir::*;
+
+    match input {
+        Dir(Left) => { state.board.kind = state.board.kind.saturating_sub(1); },
+        Dir(Right) => { state.board.kind = state.board.kind.saturating_add(1); },
+        _ => {}
+    }
+
     //
     // Render
     //
@@ -1686,10 +1693,22 @@ pub fn update(
         zo_xy!{ ARM_MAX_X, ARM_MAX_Y },
     ];
 
-    commands.push(TriangleStrip(F
-                .into_iter()
-                .map(|xy| zo_to_draw_xy(&state.sizes, xy))
-                .collect(), draw::Colour::Pole));
+    let mut f = F.to_vec();
+
+    let (transform, transform_name) = match state.board.kind {
+        0 => (IDENTITY_TRANSFORM, "IDENTITY_TRANSFORM"),
+        _ => (IDENTITY_TRANSFORM, "_"),
+    };
+
+    apply_transform(&mut f, transform);
+
+    commands.push(TriangleStrip(
+        f
+        .into_iter()
+        .map(|xy| zo_to_draw_xy(&state.sizes, xy))
+        .collect(),
+        draw::Colour::Pole
+    ));
 
     #[allow(unused)]
     fn move_along_angle_with_pre_sin_cos(
@@ -1739,10 +1758,7 @@ pub fn update(
         y += small_section_h;
 
         commands.push(Text(TextSpec{
-            text: format!(
-                "sizes: {:?}",
-                state.sizes,
-            ),
+            text: format!("{transform_name}\n"),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
                 w: state.sizes.play_xywh.w,
