@@ -359,6 +359,33 @@ mod raylib_rs_platform {
                 input_flags |= game::INPUT_LEFT_MOUSE_DOWN;
             }
 
+            if rl.is_key_down(KEY_LEFT_SHIFT) || rl.is_key_down(KEY_RIGHT_SHIFT) {
+                input_flags |= game::INPUT_SHIFT_DOWN;
+            }
+            if rl.is_key_down(KEY_LEFT_CONTROL) || rl.is_key_down(KEY_RIGHT_CONTROL) {
+                input_flags |= game::INPUT_CTRL_DOWN;
+            }
+
+            if rl.is_key_down(KEY_U) {
+                input_flags |= game::INPUT_SCALE1_DOWN;
+            }
+            if rl.is_key_down(KEY_I) {
+                input_flags |= game::INPUT_ROTATION1_DOWN;
+            }
+            if rl.is_key_down(KEY_O) {
+                input_flags |= game::INPUT_TRANSLATION1_DOWN;
+            }
+
+            if rl.is_key_down(KEY_J) {
+                input_flags |= game::INPUT_SCALE2_DOWN;
+            }
+            if rl.is_key_down(KEY_K) {
+                input_flags |= game::INPUT_ROTATION2_DOWN;
+            }
+            if rl.is_key_down(KEY_L) {
+                input_flags |= game::INPUT_TRANSLATION2_DOWN;
+            }
+
             current_stats.input_gather.end = Instant::now();
             current_stats.update.start = current_stats.input_gather.end;
 

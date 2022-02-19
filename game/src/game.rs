@@ -1288,151 +1288,25 @@ type Kind = u8;
 
 #[derive(Debug, Default)]
 struct Board {
-    tiles: Tiles,
-    eye: Eye,
-    triangles: Triangles,
     kind: Kind,
+    scale1: zo::XY,
+    scale2: zo::XY,
+    angle1: Radians,
+    angle2: Radians,
+    translation1: zo::XY,
+    translation2: zo::XY,
 }
 
 impl Board {
     fn from_seed(seed: Seed) -> Self {
-        let mut rng = xs_from_seed(seed);
-
-        let tiles = Tiles::from_rng(&mut rng);
-
-        let triangle_count = 254;
-        let overall_count = 2 + triangle_count;
-
-        let mut triangles = Vec::with_capacity(overall_count as usize);
-
-        #[cfg(any())] {
-            triangles.push(zo_xy!(0., 1.));
-            triangles.push(zo_xy!(1., 1.));
-            triangles.push(zo_xy!(1., 0.));
-        }
-
-        let edge_count = (triangle_count / 2) + 1;
-
-        let supposed_summit = zo_xy!(
-            0.5,
-            0.625,
-        );
-
-        assert!(edge_count >= 2);
-        let per_slope = edge_count / 2;
-
-        const SECTIONS: [MountainSection; 5] = [
-            push_evenly_spaced_triangles_section,
-            push_spiky_triangles_with_floor_points,
-            push_overhang_triangles,
-            push_random_length_overhang_triangles,
-
-            // TODO make a function that deterministically produces a spiral overhang.
-
-            // TODO does including this in here make a meaningful differnce?
-            random_sections_across,
-        ];
-
-        const INITIAL_POINT: zo::XY = zo_xy!(0., 0.);
-        const FINAL_POINT: zo::XY = zo_xy!(1., 0.);
-
-        fn random_sections_across(
-            triangles: &mut Triangles,
-            rng: &mut Xs,
-            Range { start, end }: Range<zo::XY>,
-            count: usize,
-        ) {
-            let (min_x, min_y) = zo::minimums((start, end));
-            let (min_x, min_y) = (min_x.0, min_y.0);
-
-            let (max_x, max_y) = zo::maximums((start, end));
-            let (max_x, max_y) = (max_x.0, max_y.0);
-
-            let x_delta = (end.x.0 - start.x.0) / count as f32;
-            let y_delta = (end.y.0 - start.y.0) / count as f32;
-
-            let mut previous_end_point = start;
-
-            let mut remaining = count;
-            loop {
-                let mut count_for_this_section = xs_range(rng, 0..12) as usize;
-
-                if remaining < count_for_this_section {
-                    count_for_this_section = remaining;
-                }
-
-                remaining -= count_for_this_section;
-
-                compile_time_assert!(SECTIONS.len() <= u32::MAX as usize);
-
-                let section = SECTIONS[xs_range(rng, 0..SECTIONS.len() as u32) as usize];
-
-                let mut x = previous_end_point.x.0 + x_delta * count_for_this_section as f32;
-                let mut y = previous_end_point.y.0 + y_delta * count_for_this_section as f32;
-
-                if x < min_x { x = min_x; }
-                if y < min_y { y = min_y; }
-
-                if x > max_x { x = max_x; }
-                if y > max_y { y = max_y; }
-
-                let next_point = zo_xy!(x, y);
-
-                section(
-                    triangles,
-                    rng,
-                    previous_end_point..next_point,
-                    count_for_this_section
-                );
-
-                if remaining == 0 { break }
-
-                previous_end_point = next_point;
-            }
-        }
-
-        random_sections_across(
-            &mut triangles,
-            &mut rng,
-            INITIAL_POINT..supposed_summit,
-            per_slope,
-        );
-
-        random_sections_across(
-            &mut triangles,
-            &mut rng,
-            supposed_summit..FINAL_POINT,
-            per_slope,
-        );
-        triangles.push(FINAL_POINT);
-
-        let mut max_y = 0.;
-        let mut summit_index = 0;
-
-        for (i, xy) in triangles.iter().enumerate() {
-            let y = xy.y.0;
-
-            if y > max_y {
-                max_y = y;
-                summit_index = i;
-            }
-        }
-
-        let mut summit = triangles[summit_index];
-
-        // The summit must be the highest point
-        summit.y.0 = max_y + 0.0015;
-
-        triangles[summit_index] = summit;
-
         Self {
-            tiles,
-            eye: Eye {
-                xy: tile::XY::from_rng(&mut rng),
-                ..<_>::default()
-            },
-            triangles,
-            ..<_>::default()
+            kind: <_>::default(),
+            scale1: zo_xy!{0.5, 0.5},
+            scale2: zo_xy!{-PI, 2.},
+            angle1: 0.5,
+            angle2: -PI,
+            translation1: zo_xy!{0.5, 0.5},
+            translation2: zo_xy!{-PI, 2.},
         }
     }
 }
@@ -1448,7 +1322,6 @@ pub struct State {
     sizes: draw::Sizes,
     board: Board,
     animation_timer: AnimationTimer
-
 }
 
 impl State {
@@ -1547,24 +1420,35 @@ mod merge_transforms_then_apply_is_equivalent_to_sequential_applies {
     }
 }
 
-pub type InputFlags = u16;
+pub type InputFlags = u32;
 
-pub const INPUT_UP_PRESSED: InputFlags              = 0b0000_0000_0000_0001;
-pub const INPUT_DOWN_PRESSED: InputFlags            = 0b0000_0000_0000_0010;
-pub const INPUT_LEFT_PRESSED: InputFlags            = 0b0000_0000_0000_0100;
-pub const INPUT_RIGHT_PRESSED: InputFlags           = 0b0000_0000_0000_1000;
+pub const INPUT_UP_PRESSED: InputFlags              = 0b0000_0000_0000_0000_0001;
+pub const INPUT_DOWN_PRESSED: InputFlags            = 0b0000_0000_0000_0000_0010;
+pub const INPUT_LEFT_PRESSED: InputFlags            = 0b0000_0000_0000_0000_0100;
+pub const INPUT_RIGHT_PRESSED: InputFlags           = 0b0000_0000_0000_0000_1000;
 
-pub const INPUT_UP_DOWN: InputFlags                 = 0b0000_0000_0001_0000;
-pub const INPUT_DOWN_DOWN: InputFlags               = 0b0000_0000_0010_0000;
-pub const INPUT_LEFT_DOWN: InputFlags               = 0b0000_0000_0100_0000;
-pub const INPUT_RIGHT_DOWN: InputFlags              = 0b0000_0000_1000_0000;
+pub const INPUT_UP_DOWN: InputFlags                 = 0b0000_0000_0000_0001_0000;
+pub const INPUT_DOWN_DOWN: InputFlags               = 0b0000_0000_0000_0010_0000;
+pub const INPUT_LEFT_DOWN: InputFlags               = 0b0000_0000_0000_0100_0000;
+pub const INPUT_RIGHT_DOWN: InputFlags              = 0b0000_0000_0000_1000_0000;
 
-pub const INPUT_INTERACT_PRESSED: InputFlags        = 0b0000_0001_0000_0000;
-pub const INPUT_INTERACT_DOWN: InputFlags           = 0b0000_0010_0000_0000;
+pub const INPUT_INTERACT_PRESSED: InputFlags        = 0b0000_0000_0001_0000_0000;
+pub const INPUT_INTERACT_DOWN: InputFlags           = 0b0000_0000_0010_0000_0000;
 
 /// Should be set if the mouse button was pressed or released this frame.
-pub const INPUT_LEFT_MOUSE_CHANGED: InputFlags      = 0b0000_0100_0000_0000;
-pub const INPUT_LEFT_MOUSE_DOWN: InputFlags         = 0b0000_1000_0000_0000;
+pub const INPUT_LEFT_MOUSE_CHANGED: InputFlags      = 0b0000_0000_0100_0000_0000;
+pub const INPUT_LEFT_MOUSE_DOWN: InputFlags         = 0b0000_0000_1000_0000_0000;
+
+pub const INPUT_SHIFT_DOWN: InputFlags              = 0b0000_0001_0000_0000_0000;
+pub const INPUT_CTRL_DOWN: InputFlags               = 0b0000_0010_0000_0000_0000;
+
+pub const INPUT_SCALE1_DOWN: InputFlags             = 0b0000_0100_0000_0000_0000;
+pub const INPUT_ROTATION1_DOWN: InputFlags          = 0b0000_1000_0000_0000_0000;
+pub const INPUT_TRANSLATION1_DOWN: InputFlags       = 0b0001_0000_0000_0000_0000;
+
+pub const INPUT_SCALE2_DOWN: InputFlags             = 0b0010_0000_0000_0000_0000;
+pub const INPUT_ROTATION2_DOWN: InputFlags          = 0b0100_0000_0000_0000_0000;
+pub const INPUT_TRANSLATION2_DOWN: InputFlags       = 0b1000_0000_0000_0000_0000;
 
 #[derive(Clone, Copy, Debug)]
 enum Input {
@@ -1579,21 +1463,21 @@ impl Input {
         use crate::Dir::*;
         if INPUT_INTERACT_PRESSED & flags != 0 {
             Interact
-        } else if (INPUT_UP_DOWN | INPUT_RIGHT_DOWN) & flags == (INPUT_UP_DOWN | INPUT_RIGHT_DOWN) {
+        } else if (INPUT_UP_PRESSED | INPUT_RIGHT_PRESSED) & flags == (INPUT_UP_PRESSED | INPUT_RIGHT_PRESSED) {
             Dir(UpRight)
-        } else if (INPUT_DOWN_DOWN | INPUT_RIGHT_DOWN) & flags == (INPUT_DOWN_DOWN | INPUT_RIGHT_DOWN) {
+        } else if (INPUT_DOWN_PRESSED | INPUT_RIGHT_PRESSED) & flags == (INPUT_DOWN_PRESSED | INPUT_RIGHT_PRESSED) {
             Dir(DownRight)
-        } else if (INPUT_DOWN_DOWN | INPUT_LEFT_DOWN) & flags == (INPUT_DOWN_DOWN | INPUT_LEFT_DOWN) {
+        } else if (INPUT_DOWN_PRESSED | INPUT_LEFT_PRESSED) & flags == (INPUT_DOWN_PRESSED | INPUT_LEFT_PRESSED) {
             Dir(DownLeft)
-        } else if (INPUT_UP_DOWN | INPUT_LEFT_DOWN) & flags == (INPUT_UP_DOWN | INPUT_LEFT_DOWN) {
+        } else if (INPUT_UP_PRESSED | INPUT_LEFT_PRESSED) & flags == (INPUT_UP_PRESSED | INPUT_LEFT_PRESSED) {
             Dir(UpRight)
-        } else if INPUT_UP_DOWN & flags != 0 {
+        } else if INPUT_UP_PRESSED & flags != 0 {
             Dir(Up)
-        } else if INPUT_DOWN_DOWN & flags != 0 {
+        } else if INPUT_DOWN_PRESSED & flags != 0 {
             Dir(Down)
-        } else if INPUT_LEFT_DOWN & flags != 0 {
+        } else if INPUT_LEFT_PRESSED & flags != 0 {
             Dir(Left)
-        } else if INPUT_RIGHT_DOWN & flags != 0 {
+        } else if INPUT_RIGHT_PRESSED & flags != 0 {
             Dir(Right)
         } else {
             NoChange
@@ -1644,8 +1528,61 @@ pub fn update(
     match input {
         Dir(Left) => { state.board.kind = state.board.kind.saturating_sub(1); },
         Dir(Right) => { state.board.kind = state.board.kind.saturating_add(1); },
+        Interact => { state.board = Board::default(); },
         _ => {}
     }
+
+    let signum = if (input_flags & INPUT_SHIFT_DOWN) == 0 {
+        1.
+    } else {
+        -1.
+    };
+
+    const SCALE_SCALE: f32 = 1./4.;
+
+    if (input_flags & INPUT_SCALE1_DOWN) != 0 {
+        if (input_flags & INPUT_CTRL_DOWN) == 0 {
+            state.board.scale1.x.0 += SCALE_SCALE * signum;
+        } else {
+            state.board.scale1.y.0 += SCALE_SCALE * signum;
+        }
+    };
+
+    if (input_flags & INPUT_SCALE2_DOWN) != 0 {
+        if (input_flags & INPUT_CTRL_DOWN) == 0 {
+            state.board.scale2.x.0 += SCALE_SCALE * signum;
+        } else {
+            state.board.scale2.y.0 += SCALE_SCALE * signum;
+        }
+    };
+
+    const ANGLE_SCALE: Radians = PI/32.;
+
+    if (input_flags & INPUT_ROTATION1_DOWN) != 0 {
+        state.board.angle1 += ANGLE_SCALE * signum;
+    };
+
+    if (input_flags & INPUT_ROTATION2_DOWN) != 0 {
+        state.board.angle2 += ANGLE_SCALE * signum;
+    };
+
+    const TRANSLATION_SCALE: f32 = 1./32.;
+
+    if (input_flags & INPUT_TRANSLATION1_DOWN) != 0 {
+        if (input_flags & INPUT_CTRL_DOWN) == 0 {
+            state.board.translation1.x.0 += TRANSLATION_SCALE * signum;
+        } else {
+            state.board.translation1.y.0 += TRANSLATION_SCALE * signum;
+        }
+    };
+
+    if (input_flags & INPUT_TRANSLATION2_DOWN) != 0 {
+        if (input_flags & INPUT_CTRL_DOWN) == 0 {
+            state.board.translation2.x.0 += TRANSLATION_SCALE * signum;
+        } else {
+            state.board.translation2.y.0 += TRANSLATION_SCALE * signum;
+        }
+    };
 
     //
     // Render
@@ -1695,8 +1632,92 @@ pub fn update(
 
     let mut f = F.to_vec();
 
+    macro_rules! scale1 { () => {[
+        state.board.scale1.x.0, 0., 0.,
+        0., state.board.scale1.y.0, 0.,
+    ]}}
+
+    macro_rules! scale2 { () => {[
+        state.board.scale2.x.0, 0., 0.,
+        0., state.board.scale2.y.0, 0.,
+    ]}}
+
+    macro_rules! rotation1 { () => {{
+        let (sin_of, cos_of) = state.board.angle1.sin_cos();
+        [
+            cos_of, -sin_of, 0.,
+            sin_of, cos_of, 0.,
+        ]
+    }}}
+
+    macro_rules! rotation2 { () => {{
+        let (sin_of, cos_of) = state.board.angle2.sin_cos();
+        [
+            cos_of, -sin_of, 0.,
+            sin_of, cos_of, 0.,
+        ]
+    }}}
+
+    macro_rules! translation1 { () => {[
+        1., 0., state.board.translation1.x.0,
+        0., 1., state.board.translation1.y.0,
+    ]}}
+
+    macro_rules! translation2 { () => {[
+        1., 0., state.board.translation2.x.0,
+        0., 1., state.board.translation2.y.0,
+    ]}}
+
     let (transform, transform_name) = match state.board.kind {
-        0 => (IDENTITY_TRANSFORM, "IDENTITY_TRANSFORM"),
+        0 => (IDENTITY_TRANSFORM, "Identity"),
+        1 => (
+            scale1!(),
+            "Scale"
+        ),
+        2 => (
+            rotation1!(),
+            "Rotation"
+        ),
+        3 => (
+            translation1!(),
+            "Translation"
+        ),
+        4 => (
+            merge_transforms(scale1!(), scale2!()),
+            "Scale-Scale"
+        ),
+        5 => (
+            merge_transforms(scale1!(), rotation1!()),
+            "Scale-Rotation"
+        ),
+        6 => (
+            merge_transforms(scale1!(), translation1!()),
+            "Scale-Translation"
+        ),
+        7 => (
+            merge_transforms(rotation1!(), scale1!()),
+            "Rotation-Scale"
+        ),
+        8 => (
+            merge_transforms(rotation1!(), rotation2!()),
+            "Rotation-Rotation"
+        ),
+        9 => (
+            merge_transforms(rotation1!(), translation1!()),
+            "Rotation-Translation"
+        ),
+        10 => (
+            merge_transforms(translation1!(), scale1!()),
+            "Translation-Scale"
+        ),
+        11 => (
+            merge_transforms(translation1!(), rotation1!()),
+            "Translation-Rotation"
+        ),
+        12 => (
+            merge_transforms(translation1!(), translation2!()),
+            "Translation-Translation"
+        ),
         _ => (IDENTITY_TRANSFORM, "_"),
     };
 
@@ -1758,7 +1779,15 @@ pub fn update(
         y += small_section_h;
 
         commands.push(Text(TextSpec{
-            text: format!("{transform_name}\n"),
+            text: format!(
+                "{transform_name}\n{:?}\n{}\n{:?}\n{:?}\n{}\n{:?}", 
+                (state.board.scale1.x.0, state.board.scale1.y.0),
+                state.board.angle1,
+                (state.board.translation1.x.0, state.board.translation1.y.0),
+                (state.board.scale2.x.0, state.board.scale2.y.0),
+                state.board.angle2,
+                (state.board.translation2.x.0, state.board.translation2.y.0),
+            ),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
                 w: state.sizes.play_xywh.w,
