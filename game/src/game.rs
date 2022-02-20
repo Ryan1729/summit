@@ -1134,7 +1134,7 @@ struct Player {
     velocity: zo::XY,
 }
 
-const PLAYER_SCALE: f32 = 1./64.;//1024.;
+const PLAYER_SCALE: f32 = 1./1024.;
 
 impl Player {
     fn get_triangles_and_transform(&self) -> (Triangles, Transform) {
@@ -1850,22 +1850,20 @@ pub fn update(
         ($strip: expr, $transform: expr) => {{
             let mut strip = $strip;
 
-            /*let camera_scale: f32 = 2.;//state.sizes.play_xywh.w / 256.;
-
-            apply_transform(
-                &mut strip,
-                [
-                    camera_scale, 0., 0.,
-                    0., camera_scale, 0.,
-                ]
-            );*/
+            let camera_scale: f32 = state.sizes.play_xywh.w / 256.;
 
             let t = merge_transforms(
                 $transform,
-                [
-                    1., 0., -(state.board.player.xy.x.0 - 0.5),
-                    0., 1., -(state.board.player.xy.y.0 - 0.5),
-                ],
+                merge_transforms(
+                    [
+                        camera_scale, 0., 0.,
+                        0., camera_scale, 0.,
+                    ],
+                    [
+                        1., 0., -(state.board.player.xy.x.0 * camera_scale) + 0.5,
+                        0., 1., -(state.board.player.xy.y.0 * camera_scale) + 0.5,
+                    ],
+                )
             );
 
             apply_transform(&mut strip, t);
