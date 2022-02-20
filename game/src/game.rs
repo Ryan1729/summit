@@ -1137,7 +1137,7 @@ struct Player {
 const PLAYER_SCALE: f32 = 1./1024.;
 
 impl Player {
-    fn get_triangles_and_transform(&self) -> (Triangles, Transform) {
+    fn get_triangles(&self) -> Triangles {
         const LEG_WIDTH: f32 = PLAYER_SCALE;
         const BETWEEN_LEGS_HALF_WIDTH: f32 = LEG_WIDTH;
         const LEG_HEIGHT: f32 = LEG_WIDTH * 4.;
@@ -1275,12 +1275,9 @@ impl Player {
             sin_of, cos_of, xy.y.0,
         ];
 
-        //apply_transform(&mut player, transform);
+        apply_transform(&mut player, transform);
 
-        (
-            player,
-            transform,//IDENTITY_TRANSFORM,
-        )
+        player
     }
 }
 
@@ -1726,20 +1723,36 @@ pub fn update(
         },
     }
 
+    let camera_scale: f32 = state.sizes.play_xywh.w / 256.;
+
+    let camera_translation = zo_xy!{
+        -(state.board.player.xy.x.0 * camera_scale) + 0.5,
+        -(state.board.player.xy.y.0 * camera_scale) + 0.5,
+    };
+
+    let camera_transform = [
+        camera_scale, 0., camera_translation.x.0,
+        0., camera_scale, camera_translation.y.0,
+    ];
+
     let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
 
-    let cursor_rel_xy = cursor_zo_xy - state.board.player.xy;
+    let cursor_rel_xy = cursor_zo_xy - zo_xy!{0.5, 0.5};
 
-    let player_triangles_before_movement = {
-        let (mut triangles, transform) = state.board.player.get_triangles_and_transform();
+    /*let cursor_rel_xy = {
+        let mut arr = [cursor_zo_xy];
 
-        apply_transform(
-            &mut triangles,
-            transform
-        );
+        let inverse_transform = [
+            1./camera_scale, 0., -camera_translation.x.0,
+            0., 1./camera_scale, -camera_translation.y.0,
+        ];
 
-        triangles
-    };
+        apply_transform(&mut arr, inverse_transform);
+
+        arr[0]
+    };*/
+
+    let player_triangles_before_movement = state.board.player.get_triangles();
 
     let bounce_vector = {
         let mut bounce_vector = zo_xy!{};
@@ -1821,7 +1834,7 @@ pub fn update(
         state.board.player.angle += PI * dt;
     }
 
-    let (player_triangles, player_transform) = state.board.player.get_triangles_and_transform();
+    let player_triangles = state.board.player.get_triangles();
 
     //
     // Render
@@ -1850,20 +1863,9 @@ pub fn update(
         ($strip: expr, $transform: expr) => {{
             let mut strip = $strip;
 
-            let camera_scale: f32 = state.sizes.play_xywh.w / 256.;
-
             let t = merge_transforms(
                 $transform,
-                merge_transforms(
-                    [
-                        camera_scale, 0., 0.,
-                        0., camera_scale, 0.,
-                    ],
-                    [
-                        1., 0., -(state.board.player.xy.x.0 * camera_scale) + 0.5,
-                        0., 1., -(state.board.player.xy.y.0 * camera_scale) + 0.5,
-                    ],
-                )
+                camera_transform,
             );
 
             apply_transform(&mut strip, t);
@@ -1921,7 +1923,7 @@ pub fn update(
     commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
 
     commands.push(TriangleStrip(
-        convert_strip!(player_triangles, player_transform),
+        convert_strip!(player_triangles),
         draw::Colour::Stone
     ));
 
@@ -1957,7 +1959,7 @@ pub fn update(
         const JUMP_ARROW_MIN_Y: f32 = -JUMP_ARROW_HALF_H;
         const JUMP_ARROW_MAX_Y: f32 = JUMP_ARROW_HALF_H;
 
-        let arrow = vec![
+        let mut arrow = vec![
             zo_xy!{ JUMP_ARROW_MIN_X, JUMP_ARROW_MAX_Y },
             zo_xy!{ 0.0, 0.0 },
             zo_xy!{ JUMP_ARROW_MAX_X, 0.0 },
@@ -1984,14 +1986,14 @@ pub fn update(
             sin_of, cos_of, y,
         ];
 
-        /*apply_transform(
+        apply_transform(
             &mut arrow,
             transform,
-        );*/
+        );
 
         (
             arrow,
-            transform//IDENTITY_TRANSFORM,
+            IDENTITY_TRANSFORM,
         )
     };
 
@@ -2026,9 +2028,11 @@ pub fn update(
 
         commands.push(Text(TextSpec{
             text: format!(
-                "sizes: {:?}\nanimation_timer: {:?}",
+                "sizes: {:?}\nanimation_timer: {:?}\ncursor_rel_xy: (\n{}\n{}\n)",
                 state.sizes,
-                state.animation_timer
+                state.animation_timer,
+                cursor_rel_xy.x.0,
+                cursor_rel_xy.y.0,
             ),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
