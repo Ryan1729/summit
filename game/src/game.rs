@@ -1290,6 +1290,8 @@ struct Board {
     player: Player,
 }
 
+const SUMMIT_EXTRA: f32 = 0.0015;
+
 impl Board {
     fn from_seed(seed: Seed) -> Self {
         let mut rng = xs_from_seed(seed);
@@ -1417,7 +1419,7 @@ impl Board {
         let mut summit = triangles[summit_index];
 
         // The summit must be the highest point
-        summit.y.0 = max_y + 0.0015;
+        summit.y.0 = max_y + SUMMIT_EXTRA;
 
         triangles[summit_index] = summit;
 
@@ -1723,34 +1725,9 @@ pub fn update(
         },
     }
 
-    let camera_scale: f32 = state.sizes.play_xywh.w / 256.;
-
-    let camera_translation = zo_xy!{
-        -(state.board.player.xy.x.0 * camera_scale) + 0.5,
-        -(state.board.player.xy.y.0 * camera_scale) + 0.5,
-    };
-
-    let camera_transform = [
-        camera_scale, 0., camera_translation.x.0,
-        0., camera_scale, camera_translation.y.0,
-    ];
-
     let cursor_zo_xy: zo::XY = draw_to_zo_xy(&state.sizes, cursor_xy);
 
     let cursor_rel_xy = cursor_zo_xy - zo_xy!{0.5, 0.5};
-
-    /*let cursor_rel_xy = {
-        let mut arr = [cursor_zo_xy];
-
-        let inverse_transform = [
-            1./camera_scale, 0., -camera_translation.x.0,
-            0., 1./camera_scale, -camera_translation.y.0,
-        ];
-
-        apply_transform(&mut arr, inverse_transform);
-
-        arr[0]
-    };*/
 
     let player_triangles_before_movement = state.board.player.get_triangles();
 
@@ -1800,7 +1777,7 @@ pub fn update(
 
     if left_mouse_button_pressed && !is_colliding {
         const JUMP_SCALE: f32 = 1024. * PLAYER_SCALE;
-        player_impulse += (cursor_zo_xy - state.board.player.xy) * JUMP_SCALE;
+        player_impulse += cursor_rel_xy * JUMP_SCALE;
     }
 
     let mut arrow_impulse = match input {
@@ -1863,6 +1840,18 @@ pub fn update(
         ($strip: expr, $transform: expr) => {{
             let mut strip = $strip;
 
+            let camera_scale: f32 = state.sizes.play_xywh.w / 256.;
+
+            let camera_translation = zo_xy!{
+                -(state.board.player.xy.x.0 * camera_scale) + 0.5,
+                -(state.board.player.xy.y.0 * camera_scale) + 0.5,
+            };
+
+            let camera_transform = [
+                camera_scale, 0., camera_translation.x.0,
+                0., camera_scale, camera_translation.y.0,
+            ];
+
             let t = merge_transforms(
                 $transform,
                 camera_transform,
@@ -1877,7 +1866,42 @@ pub fn update(
         }}
     }
 
-    let mountain: draw::TriangleStrip = 
+    let summit_xy = state.board.summit;
+
+    const POLE_HALF_W: f32 = 1./4096.;
+    const POLE_H: f32 = POLE_HALF_W * 8.;
+
+    const POLE_SUNK_IN: f32 = SUMMIT_EXTRA / 2.;
+
+    let pole_min_y = summit_xy.y.0 - POLE_SUNK_IN;
+    let pole_max_y = summit_xy.y.0 + POLE_H;
+    let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
+    let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
+
+    // TODO avoid this per-frame allocation or merge it with others.
+    let pole = vec![
+        zo_xy!{ pole_min_x, pole_min_y },
+        zo_xy!{ pole_max_x, pole_min_y },
+        zo_xy!{ pole_min_x, pole_max_y },
+        zo_xy!{ pole_max_x, pole_max_y },
+    ];
+
+    commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
+
+    const FLAG_H: f32 = POLE_H / 4.;
+    const FLAG_W: f32 = FLAG_H;
+
+    // TODO Animate the flag blowing in the wind.
+
+    let flag = vec![
+        zo_xy!{ pole_max_x, pole_max_y },
+        zo_xy!{ pole_max_x, pole_max_y - FLAG_H },
+        zo_xy!{ pole_max_x + FLAG_W, pole_max_y - FLAG_H / 2. },
+    ];
+
+    commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
+
+    let mountain: draw::TriangleStrip =
         convert_strip!(
             state.board.triangles.clone()
         );
@@ -1889,38 +1913,6 @@ pub fn update(
     };
 
     commands.push(TriangleStrip(mountain, mountain_colour));
-
-    let summit_xy = state.board.summit;
-
-    const POLE_HALF_W: f32 = 1./1024.;
-    const POLE_H: f32 = POLE_HALF_W * 8.;
-
-    let pole_top_y = summit_xy.y.0 + POLE_H;
-    let pole_min_x = summit_xy.x.0 - POLE_HALF_W;
-    let pole_max_x = summit_xy.x.0 + POLE_HALF_W;
-
-    // TODO avoid this per-frame allocation or merge it with others.
-    let pole = vec![
-        zo_xy!{ pole_min_x, summit_xy.y.0 },
-        zo_xy!{ pole_max_x, summit_xy.y.0 },
-        zo_xy!{ pole_min_x, pole_top_y },
-        zo_xy!{ pole_max_x, pole_top_y },
-    ];
-
-    commands.push(TriangleStrip(convert_strip!(pole), draw::Colour::Pole));
-
-    const FLAG_H: f32 = POLE_H / 4.;
-    const FLAG_W: f32 = FLAG_H;
-
-    // TODO Animate the flag blowing in the wind.
-
-    let flag = vec![
-        zo_xy!{ pole_max_x, pole_top_y },
-        zo_xy!{ pole_max_x, pole_top_y - FLAG_H },
-        zo_xy!{ pole_max_x + FLAG_W, pole_top_y - FLAG_H / 2. },
-    ];
-
-    commands.push(TriangleStrip(convert_strip!(flag), draw::Colour::Flag));
 
     commands.push(TriangleStrip(
         convert_strip!(player_triangles),
