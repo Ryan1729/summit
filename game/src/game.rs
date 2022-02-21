@@ -1538,6 +1538,7 @@ pub fn sizes(state: &State) -> draw::Sizes {
 /// of `0 0 1` left implicit.
 type Transform = [f32; 6];
 
+#[allow(unused)]
 const IDENTITY_TRANSFORM: Transform = [
     1., 0., 0.,
     0., 1., 0.,
@@ -1547,6 +1548,7 @@ const IDENTITY_TRANSFORM: Transform = [
 /// Combine two transforms into a single transform that when applied to a point will
 /// apply t1 then t2.
 /// AKA: t2 matrix multiplied by t1
+#[allow(unused)]
 fn merge_transforms(t1: Transform, t2: Transform) -> Transform {
     [
         t2[0] * t1[0] + t2[1] * t1[3] /* + t2[2] * 0. */,
@@ -1834,11 +1836,11 @@ pub fn update(
 
     let player_triangles_before_movement = state.board.player.get_triangles();
 
-    let (bounce_vector, is_colliding) = {
+    let (_bounce_vector, is_colliding) = {
         let mut bounce_vector = zo_xy!{};
         let mut is_colliding = false;
 
-        for pw in player_triangles_before_movement.windows(2) {
+        'outer: for pw in player_triangles_before_movement.windows(2) {
             // TODO Use a spatial partition to reduce the amount of mountain lines
             // we need to test.
             for mw in state.board.triangles.windows(2) {
@@ -1906,7 +1908,7 @@ pub fn update(
 
                     dbg!(line_normal, bounce_vector);
 
-                    break
+                    break 'outer;
                 }
             }
         }
@@ -1915,7 +1917,8 @@ pub fn update(
     };
 
     // collision detection + response
-    state.board.player.velocity -= bounce_vector;
+    // TODO re-enable
+    //state.board.player.velocity -= bounce_vector;
 
     // intergrate
     state.board.player.xy += state.board.player.velocity * dt;
@@ -1948,9 +1951,6 @@ pub fn update(
 
     macro_rules! convert_strip {
         ($strip: expr) => {{
-            convert_strip!($strip, IDENTITY_TRANSFORM)
-        }};
-        ($strip: expr, $transform: expr) => {{
             let mut strip = $strip;
 
             let camera_scale: f32 = state.sizes.play_xywh.w / 256.;
@@ -1965,12 +1965,7 @@ pub fn update(
                 0., camera_scale, camera_translation.y.0,
             ];
 
-            let t = merge_transforms(
-                $transform,
-                camera_transform,
-            );
-
-            apply_transform(&mut strip, t);
+            apply_transform(&mut strip, camera_transform);
 
             strip
                 .into_iter()
@@ -2054,7 +2049,7 @@ pub fn update(
         zo_xy!{x, y}
     }
 
-    let (jump_arrow, jump_arrow_transform) = {
+    let jump_arrow = {
         const JUMP_ARROW_HALF_W: f32 = PLAYER_SCALE;
         const JUMP_ARROW_HALF_H: f32 = JUMP_ARROW_HALF_W * 2.;
 
@@ -2096,14 +2091,11 @@ pub fn update(
             transform,
         );
 
-        (
-            arrow,
-            IDENTITY_TRANSFORM,
-        )
+        arrow
     };
 
     commands.push(TriangleStrip(
-        convert_strip!(jump_arrow, jump_arrow_transform),
+        convert_strip!(jump_arrow),
         draw::Colour::Arrow
     ));
 
