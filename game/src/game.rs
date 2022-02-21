@@ -423,7 +423,7 @@ struct Eye {
 
 // Short for "zero-one", which seemed better than `_01`.
 mod zo {
-    use core::ops::{AddAssign, SubAssign, Sub, MulAssign, Mul};
+    use core::ops::{AddAssign, Add, SubAssign, Sub, MulAssign, Mul};
 
     /// Values outside the range [0, 1] are expected, but they are expected to be
     /// clipped later.
@@ -435,6 +435,15 @@ mod zo {
     impl AddAssign for X {
         fn add_assign(&mut self, other: Self) {
             self.0 += other.0;
+        }
+    }
+
+    impl Add for X {
+        type Output = Self;
+
+        fn add(mut self, other: Self) -> Self::Output {
+            self += other;
+            self
         }
     }
 
@@ -468,12 +477,30 @@ mod zo {
         }
     }
 
+    impl Mul<X> for Zo {
+        type Output = X;
+
+        fn mul(self, mut other: X) -> Self::Output {
+            other *= self;
+            other
+        }
+    }
+
     #[derive(Copy, Clone, Debug, Default, PartialEq, PartialOrd)]
     pub struct Y(pub(crate) Zo);
 
     impl AddAssign for Y {
         fn add_assign(&mut self, other: Self) {
             self.0 += other.0;
+        }
+    }
+
+    impl Add for Y {
+        type Output = Self;
+
+        fn add(mut self, other: Self) -> Self::Output {
+            self += other;
+            self
         }
     }
 
@@ -507,6 +534,15 @@ mod zo {
         }
     }
 
+    impl Mul<Y> for Zo {
+        type Output = Y;
+
+        fn mul(self, mut other: Y) -> Self::Output {
+            other *= self;
+            other
+        }
+    }
+
     #[derive(Copy, Clone, Debug, Default, PartialEq)]
     pub struct XY {
         pub x: X,
@@ -517,6 +553,15 @@ mod zo {
         fn add_assign(&mut self, other: Self) {
             self.x += other.x;
             self.y += other.y;
+        }
+    }
+
+    impl Add for XY {
+        type Output = Self;
+
+        fn add(mut self, other: Self) -> Self::Output {
+            self += other;
+            self
         }
     }
 
@@ -552,11 +597,33 @@ mod zo {
         }
     }
 
+    impl Mul<XY> for Zo {
+        type Output = XY;
+
+        fn mul(self, mut other: XY) -> Self::Output {
+            other *= self;
+            other
+        }
+    }
+
     use core::fmt;
 
     impl fmt::Display for XY {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             write!(f, "({}, {})", self.x.0, self.y.0)
+        }
+    }
+
+    impl XY {
+        pub fn distance_sq(self, other: XY) -> Zo {
+            let x = self.x.0 - other.x.0;
+            let y = self.y.0 - other.y.0;
+
+            x * x + y * y
+        }
+
+        pub fn dot(self, other: XY) -> Zo {
+            self.x.0 * other.x.0 + self.y.0 * other.y.0
         }
     }
 
@@ -612,6 +679,8 @@ mod zo {
 
         (max_x, max_y)
     }
+
+
 }
 
 fn zo_to_draw_xy(sizes: &Sizes, xy: zo::XY) -> DrawXY {
@@ -1729,53 +1798,15 @@ pub fn update(
 
     let cursor_rel_xy = cursor_zo_xy - zo_xy!{0.5, 0.5};
 
-    let player_triangles_before_movement = state.board.player.get_triangles();
-
-    let bounce_vector = {
-        let mut bounce_vector = zo_xy!{};
-        for pw in player_triangles_before_movement.windows(2) {
-            // TODO Use a spatial partition to reduce the amount of mountain lines
-            // we need to test.
-            for mw in state.board.triangles.windows(2) {
-                let is_colliding = lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
-
-                if is_colliding {
-                    // We want a vector that will separate the player from the
-                    // collison. Since the player will enter a collision edge first,
-                    // we point the vector towards the player's center.
-
-                    // That's one point for the line that we derive the vector from,
-                    // but we need another one. A natural other point for the vector
-                    // is the center of the colliding line.
-                    let line_center = zo_xy!{
-                        (pw[0].x.0 + pw[1].x.0) / 2.,
-                        (pw[0].y.0 + pw[1].y.0) / 2.,
-                    };
-
-                    // Because we know the center point of the player, we can get a
-                    // easily get a vector pointing from the `line_center` to the
-                    // player's center with simple subtraction:
-                    bounce_vector = state.board.player.xy - line_center;
-
-                    // We want the bounce to be forceful enough that the collision
-                    // stops, so we arbitrairaly scale it up to get that effect.
-                    // TODO Derive a value here in a principled way?
-                    bounce_vector *= 16.;
-
-                    break
-                }
-            }
-        }
-        bounce_vector
-    };
-
-    let is_colliding = bounce_vector != zo_xy!{};
+    // The following is meant to be Symplectic Eulerian / Semi-Implicit Eulerian
+    // integration, based on the description at:
+    // https://www.gamedev.net/forums/topic/611021-euler-integration-collision-response/
 
     const GRAVITY: zo::XY = zo_xy!{0., -1. * PLAYER_SCALE};
 
     let mut player_impulse = GRAVITY;
 
-    if left_mouse_button_pressed && !is_colliding {
+    if left_mouse_button_pressed /* && !is_colliding */ {
         const JUMP_SCALE: f32 = 1024. * PLAYER_SCALE;
         player_impulse += cursor_rel_xy * JUMP_SCALE;
     }
@@ -1798,13 +1829,95 @@ pub fn update(
 
     player_impulse += arrow_impulse;
 
-    player_impulse += bounce_vector;
-
-    if is_colliding {
-        state.board.player.velocity = zo_xy!{};
-    }
-
+    // apply forces
     state.board.player.velocity += player_impulse * dt;
+
+    let player_triangles_before_movement = state.board.player.get_triangles();
+
+    let (bounce_vector, is_colliding) = {
+        let mut bounce_vector = zo_xy!{};
+        let mut is_colliding = false;
+
+        for pw in player_triangles_before_movement.windows(2) {
+            // TODO Use a spatial partition to reduce the amount of mountain lines
+            // we need to test.
+            for mw in state.board.triangles.windows(2) {
+                is_colliding = lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
+
+                if is_colliding {
+                    // We want a vector that will separate the player from the
+                    // collison. Since the player will enter a collision edge first,
+                    // we point the vector towards the player's center.
+
+                    // That's one point for the line that we derive the vector from,
+                    // but we need another one. A natural other point for the vector
+                    // is the center of the colliding line.
+                    let line_center = zo_xy!{
+                        (pw[0].x.0 + pw[1].x.0) / 2.,
+                        (pw[0].y.0 + pw[1].y.0) / 2.,
+                    };
+
+                    // We have two potential normals here: we can either rotate by
+                    // pi/2 radians, or -pi/2 radians. Recall that roating looks
+                    // uses this transform for given angle:
+                    // [
+                    //    cos(angle), -sin(angle), 0.,
+                    //    sin(angle), cos(angle), 0.,
+                    // ]
+
+
+                    // When the angle is pi/2, then the transform is the same as:
+                    // [
+                    //    0., -1., 0.,
+                    //    1., 0., 0.,
+                    // ]
+                    // Inlining that gives us:
+                    let line_normal_a = zo_xy!{-pw[0].y.0, pw[0].x.0};
+                    // When the angle is -pi/2, then the transform is the same as:
+                    // [
+                    //    0., 1., 0.,
+                    //    -1., 0., 0.,
+                    // ]
+                    // Inlining that gives us:
+                    let line_normal_b = zo_xy!{pw[0].y.0, -pw[0].x.0};
+
+                    // Pick the one that points the closest to the player, so we
+                    // bounce off of the mountain.
+                    let line_normal = if zo::XY::distance_sq(
+                        line_center + line_normal_a,
+                        state.board.player.xy,
+                    ) < zo::XY::distance_sq(
+                        line_center + line_normal_b,
+                        state.board.player.xy,
+                    ) {
+                        line_normal_a
+                    } else {
+                        line_normal_b
+                    };
+
+                    bounce_vector = 2.
+                        * line_normal
+                        * line_normal.dot(state.board.player.velocity);
+
+                    // We want the bounce to be forceful enough that the collision
+                    // stops, so we arbitrairaly scale it up to get that effect.
+                    // TODO Derive a value here in a principled way?
+                    bounce_vector *= 16.;
+
+                    dbg!(line_normal, bounce_vector);
+
+                    break
+                }
+            }
+        }
+
+        (bounce_vector, is_colliding)
+    };
+
+    // collision detection + response
+    state.board.player.velocity -= bounce_vector;
+
+    // intergrate
     state.board.player.xy += state.board.player.velocity * dt;
 
     if left_mouse_button_down && !is_colliding {
