@@ -1834,95 +1834,94 @@ pub fn update(
     // apply forces
     state.board.player.velocity += player_impulse * dt;
 
-    /// returns Option<zo::XY>
-    macro_rules! bounce_vector_if_overlapping {
-        ($player_triangles: expr) => {{
-            let mut bounce_vector = zo_xy!{};
-            let mut is_colliding = false;
-    
-            'outer: for pw in $player_triangles.windows(2) {
-                // TODO Use a spatial partition to reduce the amount of mountain lines
-                // we need to test.
-                for mw in state.board.triangles.windows(2) {
-                    is_colliding = lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
-    
-                    if is_colliding {
-                        // We want a vector that will separate the player from the
-                        // collison. Since the player will enter a collision edge first,
-                        // we point the vector towards the player's center.
-    
-                        // That's one point for the line that we derive the vector from,
-                        // but we need another one. A natural other point for the vector
-                        // is the center of the colliding line.
-                        let line_center = zo_xy!{
-                            (pw[0].x.0 + pw[1].x.0) / 2.,
-                            (pw[0].y.0 + pw[1].y.0) / 2.,
-                        };
-    
-                        // We have two potential normals here: we can either rotate by
-                        // pi/2 radians, or -pi/2 radians. Recall that roating looks
-                        // uses this transform for given angle:
-                        // [
-                        //    cos(angle), -sin(angle), 0.,
-                        //    sin(angle), cos(angle), 0.,
-                        // ]
-    
-    
-                        // When the angle is pi/2, then the transform is the same as:
-                        // [
-                        //    0., -1., 0.,
-                        //    1., 0., 0.,
-                        // ]
-                        // Inlining that gives us:
-                        let line_normal_a = zo_xy!{-pw[0].y.0, pw[0].x.0};
-                        // When the angle is -pi/2, then the transform is the same as:
-                        // [
-                        //    0., 1., 0.,
-                        //    -1., 0., 0.,
-                        // ]
-                        // Inlining that gives us:
-                        let line_normal_b = zo_xy!{pw[0].y.0, -pw[0].x.0};
-    
-                        // Pick the one that points the closest to the player, so we
-                        // bounce off of the mountain.
-                        let line_normal = if zo::XY::distance_sq(
-                            line_center + line_normal_a,
-                            state.board.player.xy,
-                        ) < zo::XY::distance_sq(
-                            line_center + line_normal_b,
-                            state.board.player.xy,
-                        ) {
-                            line_normal_a
-                        } else {
-                            line_normal_b
-                        };
-    
-                        bounce_vector = 2.
-                            * line_normal
-                            * line_normal.dot(state.board.player.velocity);
-    
-                        // We want the bounce to be forceful enough that the collision
-                        // stops, so we arbitrairaly scale it up to get that effect.
-                        // TODO Derive a value here in a principled way?
-                        bounce_vector *= 16.;
+    fn bounce_vector_if_overlapping(
+        player: &Player,
+        mountain_triangles: &Triangles
+    ) -> Option<zo::XY> {
+        let mut bounce_vector = zo_xy!{};
+        let mut is_colliding = false;
 
-                        dbg!(stringify!($player_triangles), bounce_vector);
-    
-                        break 'outer;
-                    }
+        'outer: for pw in player.get_triangles().windows(2) {
+            // TODO Use a spatial partition to reduce the amount of mountain lines
+            // we need to test.
+            for mw in mountain_triangles.windows(2) {
+                is_colliding = lines_collide((pw[0], pw[1]), (mw[0], mw[1]));
+
+                if is_colliding {
+                    // We want a vector that will separate the player from the
+                    // collison. Since the player will enter a collision edge first,
+                    // we point the vector towards the player's center.
+
+                    // That's one point for the line that we derive the vector from,
+                    // but we need another one. A natural other point for the vector
+                    // is the center of the colliding line.
+                    let line_center = zo_xy!{
+                        (pw[0].x.0 + pw[1].x.0) / 2.,
+                        (pw[0].y.0 + pw[1].y.0) / 2.,
+                    };
+
+                    // We have two potential normals here: we can either rotate by
+                    // pi/2 radians, or -pi/2 radians. Recall that roating looks
+                    // uses this transform for given angle:
+                    // [
+                    //    cos(angle), -sin(angle), 0.,
+                    //    sin(angle), cos(angle), 0.,
+                    // ]
+
+
+                    // When the angle is pi/2, then the transform is the same as:
+                    // [
+                    //    0., -1., 0.,
+                    //    1., 0., 0.,
+                    // ]
+                    // Inlining that gives us:
+                    let line_normal_a = zo_xy!{-pw[0].y.0, pw[0].x.0};
+                    // When the angle is -pi/2, then the transform is the same as:
+                    // [
+                    //    0., 1., 0.,
+                    //    -1., 0., 0.,
+                    // ]
+                    // Inlining that gives us:
+                    let line_normal_b = zo_xy!{pw[0].y.0, -pw[0].x.0};
+
+                    // Pick the one that points the closest to the player, so we
+                    // bounce off of the mountain.
+                    let line_normal = if zo::XY::distance_sq(
+                        line_center + line_normal_a,
+                        player.xy,
+                    ) < zo::XY::distance_sq(
+                        line_center + line_normal_b,
+                        player.xy,
+                    ) {
+                        line_normal_a
+                    } else {
+                        line_normal_b
+                    };
+
+                    bounce_vector = 2.
+                        * line_normal
+                        * line_normal.dot(player.velocity);
+
+                    // We want the bounce to be forceful enough that the collision
+                    // stops, so we arbitrairaly scale it up to get that effect.
+                    // TODO Derive a value here in a principled way?
+                    bounce_vector *= 16.;
+
+                    break 'outer;
                 }
             }
-    
-            is_colliding.then(|| bounce_vector)
-        }}
+        }
+
+        is_colliding.then(|| bounce_vector)
     }
 
     let mountain_colour;
 
     if state.board.player.xy.y.0 < 0.
     || {
-        let already_overlapping = bounce_vector_if_overlapping!(
-            state.board.player.get_triangles()
+        let already_overlapping = bounce_vector_if_overlapping(
+            &state.board.player,
+            &state.board.triangles
         ).is_some();
 
         already_overlapping
@@ -1940,8 +1939,9 @@ pub fn update(
             new_player.angle += PI * dt;
         }
 
-        if let Some(bounce_vector) = bounce_vector_if_overlapping!(
-            new_player.get_triangles()
+        if let Some(bounce_vector) = bounce_vector_if_overlapping(
+            &new_player,
+            &state.board.triangles
         ) {
             // re-integrate including collision response
             new_player = state.board.player.clone();
@@ -1954,8 +1954,9 @@ pub fn update(
                 new_player.angle += PI * dt;
             }
 
-            if bounce_vector_if_overlapping!(
-                new_player.get_triangles()
+            if bounce_vector_if_overlapping(
+                &new_player,
+                &state.board.triangles
             ).is_some() {
                 mountain_colour = draw::Colour::Flag;
 
