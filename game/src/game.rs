@@ -1501,7 +1501,9 @@ impl Board {
             triangles,
             summit,
             player: Player {
-                xy: zo_xy!{0., 8. * PLAYER_SCALE},
+                // Iteratively arrived at to make a visually noiticable error happen 
+                // in fewer frames.
+                xy: zo_xy!{0., 2.83334 * PLAYER_SCALE},
                 ..<_>::default()
             },
         }
@@ -1929,7 +1931,7 @@ pub fn update(
         mountain_colour = draw::Colour::Arrow;
         
         state.board.player.velocity = zo_xy!{};
-        state.board.player.xy.y.0 += 1./64.;
+        state.board.player.xy.y.0 += 4. * PLAYER_SCALE;
     } else {
         let mut new_player = state.board.player.clone();
 
