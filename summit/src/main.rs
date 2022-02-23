@@ -289,6 +289,18 @@ mod raylib_rs_platform {
             }
         }
 
+        const STEP_KEY: KeyboardKey   = KEY_F8;
+        const RESUME_KEY: KeyboardKey = KEY_F9;
+        const STATS_KEY: KeyboardKey  = KEY_F10;
+
+        enum StepState {
+            Running,
+            Paused,
+            Stepping,
+        }
+
+        let mut step_state = StepState::Running;
+
         #[derive(Default)]
         struct FrameStats {
             loop_body: TimeSpan,
@@ -304,12 +316,24 @@ mod raylib_rs_platform {
             current_stats.loop_body.start = Instant::now();
             current_stats.input_gather.start = current_stats.loop_body.start;
 
-            if rl.is_key_pressed(KEY_F11) {
-                rl.toggle_fullscreen();
+            if rl.is_key_pressed(STEP_KEY) {
+                step_state = match step_state {
+                    StepState::Running => StepState::Paused,
+                    StepState::Paused
+                    | StepState::Stepping => StepState::Stepping,
+                };
             }
 
-            if rl.is_key_pressed(KEY_F10) {
+            if rl.is_key_pressed(RESUME_KEY) {
+                step_state = StepState::Running;
+            }
+
+            if rl.is_key_pressed(STATS_KEY) {
                 show_stats = !show_stats;
+            }
+
+            if rl.is_key_pressed(KEY_F11) {
+                rl.toggle_fullscreen();
             }
 
             let mut input_flags = 0;
@@ -362,14 +386,25 @@ mod raylib_rs_platform {
             current_stats.input_gather.end = Instant::now();
             current_stats.update.start = current_stats.input_gather.end;
 
-            game::update(
-                &mut state,
-                &mut commands,
-                input_flags,
-                get_cursor_xy!(),
-                draw_wh(&rl),
-                rl.get_frame_time(),
-            );
+            let should_update = match step_state {
+                StepState::Running => true,
+                StepState::Paused => false,
+                StepState::Stepping => {
+                    step_state = StepState::Paused;
+                    true
+                },
+            };
+
+            if should_update {
+                game::update(
+                    &mut state,
+                    &mut commands,
+                    input_flags,
+                    get_cursor_xy!(),
+                    draw_wh(&rl),
+                    rl.get_frame_time(),
+                );
+            }
 
             current_stats.update.end = Instant::now();
             current_stats.render.start = current_stats.update.end;
@@ -506,7 +541,10 @@ mod raylib_rs_platform {
                     shader_d.draw_text_rec(
                         &font,
                         &format!(
-                            "loop {}\ninput {}\nupdate {}\nrender {}",
+                            "{:?}:step {:?}:resume {:?}:stats | loop {} input {} update {} render {}",
+                            STEP_KEY,
+                            RESUME_KEY,
+                            STATS_KEY,
                             prev_stats.loop_body,
                             prev_stats.input_gather,
                             prev_stats.update,
