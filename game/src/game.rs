@@ -610,7 +610,11 @@ mod zo {
 
     impl fmt::Display for XY {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            write!(f, "({}, {})", self.x.0, self.y.0)
+            if f.alternate() {
+                write!(f, "(\n{},\n{}\n)\n", self.x.0, self.y.0)
+            } else {
+                write!(f, "({}, {})", self.x.0, self.y.0)
+            }
         }
     }
 
@@ -1503,7 +1507,9 @@ impl Board {
             player: Player {
                 // Iteratively arrived at to make a visually noiticable error happen 
                 // in fewer frames.
-                xy: zo_xy!{0., 2.83334 * PLAYER_SCALE},
+                //xy: zo_xy!{0., 2.83334 * PLAYER_SCALE},
+                // Read off of the screen aafter adding the current XY there
+                xy: zo_xy!{0., 0.00545},
                 ..<_>::default()
             },
         }
@@ -2168,11 +2174,11 @@ pub fn update(
 
         commands.push(Text(TextSpec{
             text: format!(
-                "sizes: {:?}\nanimation_timer: {:?}\ncursor_rel_xy: (\n{}\n{}\n)",
+                "sizes: {:?}\nanimation_timer: {:?}\ncursor_rel_xy: {}\nplayer.xy: {}\n",
                 state.sizes,
                 state.animation_timer,
-                cursor_rel_xy.x.0,
-                cursor_rel_xy.y.0,
+                cursor_rel_xy,
+                state.board.player.xy,
             ),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
