@@ -1506,7 +1506,7 @@ impl Board {
             summit,
             player: Player {
                 // Read off of the screen while paused
-                xy: zo_xy!{0., 0.005375121},
+                xy: zo_xy!{0., 0.007625},
                 ..<_>::default()
             },
         }
@@ -2005,7 +2005,7 @@ pub fn update(
         ($strip: expr) => {{
             let mut strip = $strip;
 
-            let camera_scale: f32 = state.sizes.play_xywh.w / 256.;
+            let camera_scale: f32 = state.sizes.play_xywh.w / 24.;//state.sizes.play_xywh.w / 256.;
 
             let camera_translation = zo_xy!{
                 -(state.board.player.xy.x.0 * camera_scale) + 0.5,
@@ -2070,7 +2070,7 @@ pub fn update(
 
     commands.push(TriangleStrip(
         convert_strip!(player_triangles),
-        draw::Colour::Stone
+        draw::Colour::Arrow//draw::Colour::Stone
     ));
 
     fn move_along_angle_with_pre_sin_cos(
