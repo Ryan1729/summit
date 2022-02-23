@@ -1505,11 +1505,8 @@ impl Board {
             triangles,
             summit,
             player: Player {
-                // Iteratively arrived at to make a visually noiticable error happen 
-                // in fewer frames.
-                //xy: zo_xy!{0., 2.83334 * PLAYER_SCALE},
-                // Read off of the screen aafter adding the current XY there
-                xy: zo_xy!{0., 0.00545},
+                // Read off of the screen while paused
+                xy: zo_xy!{0., 0.005375121},
                 ..<_>::default()
             },
         }

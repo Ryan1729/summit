@@ -120,6 +120,16 @@ mod raylib_rs_platform {
     }
 
     pub fn inner_main() {
+        let start_paused = {
+            let mut args = std::env::args();
+
+            args.next(); // exe name
+
+            args.next()
+                .map(|arg| arg.to_lowercase().contains("pause"))
+                .unwrap_or(false)
+        };
+
         let (mut rl, thread) = {
             // TODO: Read display size ourselves, since while raylib tries to figure
             // out the right size if `0, 0` is passed, it sometimes gets the wrong
@@ -299,7 +309,11 @@ mod raylib_rs_platform {
             Stepping,
         }
 
-        let mut step_state = StepState::Running;
+        let mut step_state = if start_paused {
+            StepState::Paused
+        } else {
+            StepState::Running
+        };
 
         #[derive(Default)]
         struct FrameStats {
