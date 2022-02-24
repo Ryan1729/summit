@@ -479,6 +479,18 @@ mod raylib_rs_platform {
 
                 for cmd in commands.0.iter() {
                     use game::draw::{DrawXY, Command::*};
+                    macro_rules! convert_colour {
+                        ($game_colour: expr) => {{
+                            use game::draw::Colour::*;
+                            match $game_colour {
+                                Stone => STONE,
+                                Pole => POLE,
+                                Flag => FLAG,
+                                Arrow => ARROW,
+                            }
+                        }}
+                    }
+
                     match cmd {
                         Sprite(s) => {
                             let spec = source_spec(s.sprite);
@@ -537,15 +549,17 @@ mod raylib_rs_platform {
                                 .map(|DrawXY{x, y}| Vector2{x: *x, y: *y})
                                 .collect();
 
-                            use game::draw::Colour::*;
                             shader_d.draw_triangle_strip(
                                 &vectors,
-                                match colour {
-                                    Stone => STONE,
-                                    Pole => POLE,
-                                    Flag => FLAG,
-                                    Arrow => ARROW,
-                                }
+                                convert_colour!(colour),
+                            );
+                        }
+                        Line((xy1, xy2), colour) => {
+                            shader_d.draw_line_ex(
+                                Vector2 { x: xy1.x, y: xy1.y },
+                                Vector2 { x: xy2.x, y: xy2.y },
+                                256. / game::CAMERA_SCALE_FACTOR,
+                                convert_colour!(colour),
                             );
                         }
                     }

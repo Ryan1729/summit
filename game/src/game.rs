@@ -1682,6 +1682,8 @@ pub type CursorXY = DrawXY;
 
 pub type DeltaTimeInSeconds = f32;
 
+pub const CAMERA_SCALE_FACTOR: f32 = 24.;//256.;
+
 pub fn update(
     state: &mut State,
     commands: &mut dyn ClearableStorage<draw::Command>,
@@ -2005,7 +2007,7 @@ pub fn update(
         ($strip: expr) => {{
             let mut strip = $strip;
 
-            let camera_scale: f32 = state.sizes.play_xywh.w / 24.;//state.sizes.play_xywh.w / 256.;
+            let camera_scale: f32 = state.sizes.play_xywh.w / CAMERA_SCALE_FACTOR;
 
             let camera_translation = zo_xy!{
                 -(state.board.player.xy.x.0 * camera_scale) + 0.5,
@@ -2144,6 +2146,34 @@ pub fn update(
         convert_strip!(jump_arrow),
         draw::Colour::Arrow
     ));
+
+    let mountain_points: Vec<_> = convert_strip!(vec![
+        state.board.triangles[2],
+        state.board.triangles[0],
+    ]);
+
+    let player_triangles = state.board.player.get_triangles();
+
+    let player_points: Vec<_> = convert_strip!(player_triangles.clone());
+
+    let lines = [
+        (mountain_points[0], mountain_points[1]),
+        (player_points[13], player_points[14]),
+        (player_points[15], player_points[13]),
+    ];
+
+    dbg!([
+        (state.board.triangles[2], state.board.triangles[0]),
+        (player_triangles[13], player_triangles[14]),
+        (player_triangles[15], player_triangles[13]),
+    ]);
+
+    for line in lines {
+        commands.push(Line(
+            line,
+            draw::Colour::Flag
+        ));
+    }
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 

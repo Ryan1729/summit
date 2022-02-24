@@ -179,11 +179,14 @@ pub enum Colour {
     Arrow,
 }
 
+pub type Line = (DrawXY, DrawXY);
+
 #[derive(Debug)]
 pub enum Command {
     Sprite(SpriteSpec),
     Text(TextSpec),
-    TriangleStrip(TriangleStrip, Colour)
+    TriangleStrip(TriangleStrip, Colour),
+    Line(Line, Colour),
 }
 
 #[derive(Debug)]
