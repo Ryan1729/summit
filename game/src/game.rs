@@ -824,8 +824,10 @@ fn lines_collide(l1: Line, l2: Line) -> bool {
     0. <= t_times_d && t_times_d <= d && 0. <= u_times_d && u_times_d <= d
 }
 
-#[test]
-fn lines_collide_returns_true_for_these_observed_values() {
+#[cfg(test)]
+mod lines_collide_returns_true_for_these_observed_values {
+    use super::*;
+
     // We observed what should be a collision go undetected.
     // The following diagram describes the scenario:
     // |    |/ <-- slope
@@ -834,21 +836,30 @@ fn lines_collide_returns_true_for_these_observed_values() {
     // |__/_|  <-- player-avatar's right leg
     //   /
 
-    let slope_top = zo_xy!{0.014025899, 0.015630051};
-    let slope_bottom = zo_xy!{};
+    const SLOPE_TOP: zo::XY = zo_xy!{0.014025899, 0.015630051};
+    const SLOPE_BOTTOM: zo::XY = zo_xy!{};
 
-    let right_leg_right_top = zo_xy!{0.001953125, 0.0059794323};
-    let right_leg_right_bottom = zo_xy!{0.001953125, 0.0020731823};
-    let right_leg_left_bottom = zo_xy!{0.0009765625, 0.0020731823};
+    const SLOPE: Line = (SLOPE_TOP, SLOPE_BOTTOM);
 
-    let slope = (slope_top, slope_bottom);
+    const RIGHT_LEG_RIGHT_BOTTOM: zo::XY = zo_xy!{0.001953125, 0.0020731823};
 
-    let leg_right_side = (right_leg_right_top, right_leg_right_bottom);
+    #[test]
+    fn leg_bottom() {
+        let right_leg_left_bottom = zo_xy!{0.0009765625, 0.0020731823};
 
-    let leg_bottom = (right_leg_right_bottom, right_leg_left_bottom);
+        let leg_bottom = (RIGHT_LEG_RIGHT_BOTTOM, right_leg_left_bottom);
 
-    assert!(lines_collide(leg_bottom, slope));
-    assert!(lines_collide(leg_right_side, slope));
+        assert!(lines_collide(leg_bottom, SLOPE));
+    }
+
+    #[test]
+    fn leg_right_side() {
+        let right_leg_right_top = zo_xy!{0.001953125, 0.0059794323};
+
+        let leg_right_side = (right_leg_right_top, RIGHT_LEG_RIGHT_BOTTOM);
+
+        assert!(lines_collide(leg_right_side, SLOPE));
+    }
 }
 
 pub const TOP_Y: f32 = 1.0;
@@ -1961,7 +1972,7 @@ pub fn update(
         already_overlapping
     } {
         mountain_colour = draw::Colour::Arrow;
-        
+
         state.board.player.velocity = zo_xy!{};
         state.board.player.xy.y.0 += 4. * PLAYER_SCALE;
     } else {
