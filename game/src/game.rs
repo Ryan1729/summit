@@ -879,56 +879,105 @@ fn lines_collide_acts_as_expected_on_these_origin_crossing_examples() {
     }
 }
 
-#[test]
-fn lines_collide_acts_as_expected_on_these_examples_where_d_is_non_negative() {
-    macro_rules! assert_d_non_negative {
-        ($l1: expr, $l2: expr) => {{
-            let l1 = $l1;
-            let l2 = $l2;
+#[cfg(test)]
+mod lines_collide_can_return_both_values_when_the_collision_values_are {
+    use super::*;
 
-            let x1 = l1.0.x.0;
-            let y1 = l1.0.y.0;
-
-            let x2 = l1.1.x.0;
-            let y2 = l1.1.y.0;
-
-            let x3 = l2.0.x.0;
-            let y3 = l2.0.y.0;
-
-            let x4 = l2.1.x.0;
-            let y4 = l2.1.y.0;
-
-            let d = ((x1 - x2) * (y3 - y4)) - ((x3 - x4) * (y1 - y2));
-
-            assert!(d >= 0., "{:?}, {:?}", l1, l2);
-        }}
+    macro_rules! with_str {
+        ($e: expr) => {
+            ($e, stringify!($e))
+        }
     }
 
     macro_rules! a {
-        ($l1: expr, $l2: expr $(,)?) => {{
-            assert_d_non_negative!($l1, $l2);
+        (
+            $(
+                (($x1: expr, $y1: expr), ($x2: expr, $y2: expr))
+                (($x3: expr, $y3: expr), ($x4: expr, $y4: expr))
+                $expected: literal
+            )+
+            ;
+            $d_op: tt $t_times_d_op: tt $u_times_d_op: tt
+        ) => {{
+            $(
+                let l1 = (zo_xy!{$x1, $y1}, zo_xy!{$x2, $y2});
+                let l2 = (zo_xy!{$x3, $y3}, zo_xy!{$x4, $y4});
 
-            assert!(lines_collide($l1, $l2))
+                // These tests assume that the implementation of `lines_collide`
+                // does the same calculations. We could use some shared macro in
+                // the implementation, but that makes both this and the
+                // implementation harder to read, and honestly I would be surprised
+                // if we changed either after we get it all working.
+
+                let (d, d_str) = with_str!(
+                    (($x1 - $x2) * ($y3 - $y4)) - (($x3 - $x4) * ($y1 - $y2))
+                );
+                let d_str_lit = "(($x1 - $x2) * ($y3 - $y4)) - (($x3 - $x4) * ($y1 - $y2))";
+
+                let (t_times_d, t_times_d_str) = with_str!(
+                    (($x1 - $x3) * ($y3 - $y4)) - (($x3 - $x4) * ($y1 - $y3))
+                );
+                let t_times_d_str_lit = "(($x1 - $x3) * ($y3 - $y4)) - (($x3 - $x4) * ($y1 - $y3))";
+
+                let (u_times_d, u_times_d_str) = with_str!(
+                    (($x1 - $x3) * ($y1 - $y2)) - (($x1 - $x2) * ($y1 - $y3))
+                );
+                let u_times_d_str_lit = "(($x1 - $x3) * ($y3 - $y4)) - (($x3 - $x4) * ($y1 - $y3))";
+
+                assert!(d $d_op 0., "\n\nd: {}\n = {} {}\n\n", d_str_lit, d_str, stringify!($d_op 0.));
+                assert!(t_times_d $t_times_d_op 0., "\n\nt_times_d: {}\n = {} {}\n\n", t_times_d_str_lit, t_times_d_str, stringify!($t_times_d_op 0.));
+                assert!(u_times_d $u_times_d_op 0., "\n\nu_times_d: {}\n = {} {}\n\n", u_times_d_str_lit, u_times_d_str, stringify!($u_times_d_op 0.));
+
+                let actual = lines_collide(l1, l2);
+                assert_eq!(actual, $expected, "expected {}, got {}", $expected, actual);
+            )+
         }}
     }
 
-    macro_rules! a_not {
-        ($l1: expr, $l2: expr $(,)?) => {{
-            assert_d_non_negative!($l1, $l2);
-
-            assert!(!lines_collide($l1, $l2))
-        }}
+    #[test]
+    fn pos_pos_pos() {
+        a!(
+            ((-1., 1.), ( 1., 0.)) (( 0.,-1.), ( 0., 1.)) true
+            ((-1., 1.), ( 1., 0.)) (( 0.,-1.), ( 0., 0.)) false
+            ;
+            > > >
+        );
     }
 
-    a!(
-        (zo_xy!{-1., 0.}, zo_xy!{ 1., 0.}),
-        (zo_xy!{ 0.,-1.}, zo_xy!{ 0., 1.})
-    );
+    #[test]
+    fn neg_pos_pos() {
+        todo!();
+    }
 
-    a_not!(
-        (zo_xy!{-1., 0.}, zo_xy!{ 1., 0.}),
-        (zo_xy!{-1., 1.}, zo_xy!{ 1., 1.}),
-    );
+    #[test]
+    fn pos_neg_pos() {
+        todo!();
+    }
+
+    #[test]
+    fn neg_neg_pos() {
+        todo!();
+    }
+
+    #[test]
+    fn pos_pos_neg() {
+        todo!();
+    }
+
+    #[test]
+    fn neg_pos_neg() {
+        todo!();
+    }
+
+    #[test]
+    fn pos_neg_neg() {
+        todo!();
+    }
+
+    #[test]
+    fn neg_neg_neg() {
+        todo!();
+    }
 }
 
 fn bounce_vector_if_overlapping(
