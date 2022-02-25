@@ -817,7 +817,7 @@ fn lines_collide(l1: Line, l2: Line) -> bool {
     let t_times_d = ((x1 - x3) * (y3 - y4)) - ((x3 - x4) * (y1 - y3));
     let u_times_d = ((x1 - x3) * (y1 - y2)) - ((x1 - x2) * (y1 - y3));
 
-    //debug_assert!(d >= 0.); // fails! TODO `.abs()`?
+    debug_assert!(d >= 0.); // fails! TODO `.abs()`?
     //debug_assert!(t_times_d >= 0.);
     //debug_assert!(u_times_d >= 0.);
 
@@ -860,6 +860,75 @@ mod lines_collide_returns_true_for_these_observed_values {
 
         assert!(lines_collide(leg_right_side, SLOPE));
     }
+}
+
+#[test]
+fn lines_collide_acts_as_expected_on_these_origin_crossing_examples() {
+    // Short for half-length;
+    const H: zo::Zo = 1.;
+
+    const L1: Line = (zo_xy!{-H, 0.}, zo_xy!{ H, 0.});
+    const L2: Line = (zo_xy!{-H, -H}, zo_xy!{ H,  H});
+    const L3: Line = (zo_xy!{0., -H}, zo_xy!{0.,  H});
+    const L4: Line = (zo_xy!{ H, -H}, zo_xy!{-H,  H});
+
+    for l1 in [L1, L2, L3, L4] {
+        for l2 in [L1, L2, L3, L4] {
+            assert!(lines_collide(l1, l2));
+        }
+    }
+}
+
+#[test]
+fn lines_collide_acts_as_expected_on_these_examples_where_d_is_non_negative() {
+    macro_rules! assert_d_non_negative {
+        ($l1: expr, $l2: expr) => {{
+            let l1 = $l1;
+            let l2 = $l2;
+
+            let x1 = l1.0.x.0;
+            let y1 = l1.0.y.0;
+
+            let x2 = l1.1.x.0;
+            let y2 = l1.1.y.0;
+
+            let x3 = l2.0.x.0;
+            let y3 = l2.0.y.0;
+
+            let x4 = l2.1.x.0;
+            let y4 = l2.1.y.0;
+
+            let d = ((x1 - x2) * (y3 - y4)) - ((x3 - x4) * (y1 - y2));
+
+            assert!(d >= 0., "{:?}, {:?}", l1, l2);
+        }}
+    }
+
+    macro_rules! a {
+        ($l1: expr, $l2: expr $(,)?) => {{
+            assert_d_non_negative!($l1, $l2);
+
+            assert!(lines_collide($l1, $l2))
+        }}
+    }
+
+    macro_rules! a_not {
+        ($l1: expr, $l2: expr $(,)?) => {{
+            assert_d_non_negative!($l1, $l2);
+
+            assert!(!lines_collide($l1, $l2))
+        }}
+    }
+
+    a!(
+        (zo_xy!{-1., 0.}, zo_xy!{ 1., 0.}),
+        (zo_xy!{ 0.,-1.}, zo_xy!{ 0., 1.})
+    );
+
+    a_not!(
+        (zo_xy!{-1., 0.}, zo_xy!{ 1., 0.}),
+        (zo_xy!{-1., 1.}, zo_xy!{ 1., 1.}),
+    );
 }
 
 fn bounce_vector_if_overlapping(
@@ -947,7 +1016,7 @@ fn bounce_vector_if_overlapping(
 fn bounce_vector_if_overlapping_detects_this_overlap() {
     let player = Player {
         // We unrealisitcally place the middle of the player on the line.
-        xy: zo_xy!{0.25, 0.25}, 
+        xy: zo_xy!{0.25, 0.25},
         ..<_>::default()
     };
 
