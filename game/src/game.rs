@@ -924,9 +924,11 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
                 );
                 let u_times_d_str_lit = "(($x1 - $x3) * ($y3 - $y4)) - (($x3 - $x4) * ($y1 - $y3))";
 
-                assert!(d $d_op 0., "\n\nd: {}\n = {} {}\n\n", d_str_lit, d_str, stringify!($d_op 0.));
-                assert!(t_times_d $t_times_d_op 0., "\n\nt_times_d: {}\n = {} {}\n\n", t_times_d_str_lit, t_times_d_str, stringify!($t_times_d_op 0.));
-                assert!(u_times_d $u_times_d_op 0., "\n\nu_times_d: {}\n = {} {}\n\n", u_times_d_str_lit, u_times_d_str, stringify!($u_times_d_op 0.));
+                let expected = $expected;
+
+                assert!(d $d_op 0., "\n\nexpected: {expected}\nd: {}\n = {} {}\n\n", d_str_lit, d_str, stringify!($d_op 0.));
+                assert!(t_times_d $t_times_d_op 0., "\n\nexpected: {expected}\nt_times_d: {}\n = {} {}\n\n", t_times_d_str_lit, t_times_d_str, stringify!($t_times_d_op 0.));
+                assert!(u_times_d $u_times_d_op 0., "\n\nexpected: {expected}\nu_times_d: {}\n = {} {}\n\n", u_times_d_str_lit, u_times_d_str, stringify!($u_times_d_op 0.));
 
                 let actual = lines_collide(l1, l2);
                 assert_eq!(actual, $expected, "expected {}, got {}", $expected, actual);
@@ -939,6 +941,10 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         a!(
             ((-1., 1.), ( 1., 0.)) (( 0.,-1.), ( 0., 1.)) true
             ((-1., 1.), ( 1., 0.)) (( 0.,-1.), ( 0., 0.)) false
+            // via SMT
+            ((1./8., 1./2.), ( 1., 0.)) (( -1./2., -1./2.), (1., -1.)) false
+            // Modified from above: flip sign of y4
+            ((1./8., 1./2.), ( 1., 0.)) (( -1./2., -1./2.), (1., 1.)) true
             ;
             > > >
         );
@@ -946,17 +952,38 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
 
     #[test]
     fn neg_pos_pos() {
-        todo!();
+        a!(
+            // via SMT
+            // TODO adjust to get both a true and false case
+            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -3.)) true
+            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -3.)) false
+            ;
+            < > >
+        );
     }
 
     #[test]
     fn pos_neg_pos() {
-        todo!();
+        a!(
+            // via SMT
+            // TODO adjust to get both a true and false case
+            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), (-1., 1.)) false
+            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), (-1., 1.)) true
+            ;
+            > < >
+        );
     }
 
     #[test]
     fn neg_neg_pos() {
-        todo!();
+        a!(
+            // via SMT
+            // TODO adjust to get both a true and false case
+            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -1.)) true
+            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -1.)) false
+            ;
+            < < >
+        );
     }
 
     #[test]
@@ -978,6 +1005,93 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     fn neg_neg_neg() {
         todo!();
     }
+
+    // The test cases labeled "Via SMT" above were found by passing the following
+    // code into the Z3 SMT solver, and then manually flipping the `>` to `<` as
+    // approppiate for each test case.
+    /*
+
+    ; Variable declarations
+    (declare-fun x1 () Real)
+    (declare-fun y1 () Real)
+    (declare-fun x2 () Real)
+    (declare-fun y2 () Real)
+
+    (declare-fun x3 () Real)
+    (declare-fun y3 () Real)
+    (declare-fun x4 () Real)
+    (declare-fun y4 () Real)
+
+    ;
+    ; Constraints
+    ;
+
+    ; Lines not points
+    (assert (not
+        (and
+            (= x1 x2)
+            (= y1 y2)
+        )
+    ))
+    (assert (not
+        (and
+            (= x3 x4)
+            (= y3 y4)
+        )
+    ))
+
+    ; d has right sign
+    (assert (>
+        (-
+            (*
+                (- x1 x2)
+                (- y3 y4)
+            )
+            (*
+                (- x3 x4)
+                (- y1 y2)
+            )
+        )
+        0
+    ))
+
+    ; t * d has right sign
+    (assert (>
+        (-
+            (*
+                (- x1 x3)
+                (- y3 y4)
+            )
+            (*
+                (- y1 y3)
+                (- x3 x4)
+            )
+        )
+        0
+    ))
+
+    ; u * d has right sign
+    (assert (>
+        (-
+            (*
+                (- x1 x3)
+                (- y1 y2)
+            )
+            (*
+                (- y1 y3)
+                (- x1 x2)
+            )
+        )
+        0
+    ))
+
+
+    ; Solve
+    (check-sat)
+    (get-model)
+
+    */
+
 }
 
 fn bounce_vector_if_overlapping(
