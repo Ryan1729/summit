@@ -1029,27 +1029,27 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     }
 
     // The test cases labeled "Via SMT" above were found by passing the following
-    // code into the Z3 SMT solver, and then manually flipping the `>` to `<`, 
-    // and/or commenting out the intersection check, as appropriate for each test 
+    // code into the Z3 SMT solver, and then manually flipping the `>` to `<`,
+    // and/or commenting out the intersection check, as appropriate for each test
     // case. The particular online version I used raised an "unsupported" error when
     // I tried to use `let`, which is why I repeated subexpressions so much.
     /*
-    
+
     ; Variable declarations
     (declare-fun x1 () Real)
     (declare-fun y1 () Real)
     (declare-fun x2 () Real)
     (declare-fun y2 () Real)
-    
+
     (declare-fun x3 () Real)
     (declare-fun y3 () Real)
     (declare-fun x4 () Real)
     (declare-fun y4 () Real)
-    
+
     ;
     ; Constraints
     ;
-    
+
     ; Lines not points
     (assert (not
         (and
@@ -1063,7 +1063,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
             (= y3 y4)
         )
     ))
-    
+
     ; d has right sign
     (assert (>
         (-
@@ -1078,7 +1078,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         0
     ))
-    
+
     ; t * d has right sign
     (assert (>
         (-
@@ -1093,7 +1093,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         0
     ))
-    
+
     ; u * d has right sign
     (assert (>
         (-
@@ -1108,7 +1108,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         0
     ))
-    
+
     ; the lines intersect if 0 <= t <= 1 and 0 <= u <= 1
     ; 0 <= t
     (assert (<=
@@ -1166,7 +1166,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         1
     ))
-    
+
     ; 0 <= u
     (assert (<=
         0
@@ -1223,7 +1223,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         1
     ))
-    
+
     ; Solve
     (check-sat)
     (get-model)
@@ -1235,7 +1235,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     /*
     ; the lines intersect if 0 <= t <= 1 and 0 <= u <= 1
     ; assert at least on intersection condition is violated
-    (assert (or 
+    (assert (or
       (>
         0
         (/
