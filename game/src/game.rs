@@ -781,9 +781,7 @@ type Triangles = Vec<zo::XY>;
 type Line = (zo::XY, zo::XY);
 
 fn lines_collide(l1: Line, l2: Line) -> bool {
-    if l1 == l2 { return true }
-
-    // Thi is based on this wikipedia page:
+    // This is based on this wikipedia page:
     // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment
 
     // Two terms, `t` and `u` are defined there, including formulae for them.
@@ -817,11 +815,28 @@ fn lines_collide(l1: Line, l2: Line) -> bool {
     let t_times_d = ((x1 - x3) * (y3 - y4)) - ((x3 - x4) * (y1 - y3));
     let u_times_d = ((x1 - x3) * (y1 - y2)) - ((x1 - x2) * (y1 - y3));
 
+    /*
     if d >= 0. {
         0. <= t_times_d && t_times_d <= d && 0. <= u_times_d && u_times_d <= d
     } else {
         0. >= t_times_d && t_times_d >= d && 0. >= u_times_d && u_times_d >= d
     }
+    */
+    // ^^^ A more readable, but also more branchy equivalent of the below code.
+    // See comparision at: https://rust.godbolt.org/z/8rYYhn5W9
+    // Fair warning, I have not done any real benchmarking of this code.
+
+    let d_signum = d.signum();
+    let t_times_d_signum = t_times_d.signum();
+    let u_times_d_signum = u_times_d.signum();
+
+    let d_abs = d.abs();
+    let t_times_d_abs = t_times_d.abs();
+    let u_times_d_abs = u_times_d.abs();
+
+    d_signum == t_times_d_signum && t_times_d_signum == u_times_d_signum
+    && 0. <= t_times_d_abs && t_times_d_abs <= d_abs
+    && 0. <= u_times_d_abs && u_times_d_abs <= d_abs
 }
 
 #[cfg(test)]
