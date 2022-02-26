@@ -817,11 +817,11 @@ fn lines_collide(l1: Line, l2: Line) -> bool {
     let t_times_d = ((x1 - x3) * (y3 - y4)) - ((x3 - x4) * (y1 - y3));
     let u_times_d = ((x1 - x3) * (y1 - y2)) - ((x1 - x2) * (y1 - y3));
 
-    debug_assert!(d >= 0.); // fails! TODO `.abs()`?
-    //debug_assert!(t_times_d >= 0.);
-    //debug_assert!(u_times_d >= 0.);
-
-    0. <= t_times_d && t_times_d <= d && 0. <= u_times_d && u_times_d <= d
+    if d >= 0. {
+        0. <= t_times_d && t_times_d <= d && 0. <= u_times_d && u_times_d <= d
+    } else {
+        0. >= t_times_d && t_times_d >= d && 0. >= u_times_d && u_times_d >= d
+    }
 }
 
 #[cfg(test)]
@@ -966,8 +966,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         a!(
             // via SMT
             (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), (-1., 1.)) false
-            // via SMT
-            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), (-1., 3.)) true
+            // SMT reports true case is unsatisfiable
             ;
             > < >
         );
@@ -999,9 +998,8 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     fn neg_pos_neg() {
         a!(
             // via SMT
-            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), (-1., -3.)) true
-            // Modified from above: flip sign of y4
-            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( -1., 3.)) false
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), (-1., -3.)) false
+            // SMT reports true case is unsatisfiable
             ;
             < > <
         );
@@ -1023,8 +1021,8 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         a!(
             // via SMT
             (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( 1., 2.)) true
-            // Modified from above: flip sign of y4
-            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( 1., -2.)) true
+            // via SMT, by invering intersection check
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( 1., 7./2.)) false
             ;
             < < <
         );
@@ -1036,7 +1034,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     // case. The particular online version I used raised an "unsupported" error when
     // I tried to use `let`, which is why I repeated subexpressions so much.
     /*
-
+    
     ; Variable declarations
     (declare-fun x1 () Real)
     (declare-fun y1 () Real)
@@ -1119,12 +1117,12 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
            ; t * d
            (-
               (*
-                (- x1 x2)
+                (- x1 x3)
                 (- y3 y4)
               )
               (*
+                (- y1 y3)
                 (- x3 x4)
-                (- y1 y2)
               )
            )
            ; d
@@ -1146,12 +1144,12 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
            ; t * d
            (-
               (*
-                (- x1 x2)
+                (- x1 x3)
                 (- y3 y4)
               )
               (*
+                (- y1 y3)
                 (- x3 x4)
-                (- y1 y2)
               )
            )
            ; d
@@ -1232,6 +1230,122 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
 
     */
 
+    // I needed to invert the intersection as well. Here's the code for that check
+    // which replaces the asserts checking for an intersection.
+    /*
+    ; the lines intersect if 0 <= t <= 1 and 0 <= u <= 1
+    ; assert at least on intersection condition is violated
+    (assert (or 
+      (>
+        0
+        (/
+           ; t * d
+           (-
+              (*
+                (- x1 x3)
+                (- y3 y4)
+              )
+              (*
+                (- y1 y3)
+                (- x3 x4)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+      )
+    (>
+        (/
+           ; t * d
+           (-
+              (*
+                (- x1 x3)
+                (- y3 y4)
+              )
+              (*
+                (- y1 y3)
+                (- x3 x4)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+        1
+    )
+    (>
+        0
+        (/
+           ; u * d
+           (-
+              (*
+                (- x1 x3)
+                (- y1 y2)
+              )
+              (*
+                (- y1 y3)
+                (- x1 x2)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+    )
+    (>
+        (/
+           ; u * d
+           (-
+              (*
+                (- x1 x3)
+                (- y1 y2)
+              )
+              (*
+                (- y1 y3)
+                (- x1 x2)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+        1
+    )
+    ))
+    */
 }
 
 fn bounce_vector_if_overlapping(
