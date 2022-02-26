@@ -954,9 +954,8 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     fn neg_pos_pos() {
         a!(
             // via SMT
-            // TODO adjust to get both a true and false case
-            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -3.)) true
             (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -3.)) false
+            // SMT reports true case is unsatisfiable
             ;
             < > >
         );
@@ -966,9 +965,9 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     fn pos_neg_pos() {
         a!(
             // via SMT
-            // TODO adjust to get both a true and false case
             (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), (-1., 1.)) false
-            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), (-1., 1.)) true
+            // via SMT
+            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), (-1., 3.)) true
             ;
             > < >
         );
@@ -978,9 +977,8 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     fn neg_neg_pos() {
         a!(
             // via SMT
-            // TODO adjust to get both a true and false case
-            (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -1.)) true
             (( 1./8., 1./2.), ( 1., 0.)) ((-1./2., -1./2.), ( -1., -1.)) false
+            // SMT reports true case is unsatisfiable
             ;
             < < >
         );
@@ -988,27 +986,55 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
 
     #[test]
     fn pos_pos_neg() {
-        todo!();
+        a!(
+            // via SMT
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( -1., -3./2.)) false
+            // SMT reports true case is unsatisfiable
+            ;
+            > > <
+        );
     }
 
     #[test]
     fn neg_pos_neg() {
-        todo!();
+        a!(
+            // via SMT
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), (-1., -3.)) true
+            // Modified from above: flip sign of y4
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( -1., 3.)) false
+            ;
+            < > <
+        );
     }
 
     #[test]
     fn pos_neg_neg() {
-        todo!();
+        a!(
+            // via SMT
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( -1., 0.)) false
+            // SMT reports true case is unsatisfiable
+            ;
+            > < <
+        );
     }
 
     #[test]
     fn neg_neg_neg() {
-        todo!();
+        a!(
+            // via SMT
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( 1., 2.)) true
+            // Modified from above: flip sign of y4
+            (( 1./8., 1./2.), ( 1., 3.)) ((-1./2., -1./2.), ( 1., -2.)) true
+            ;
+            < < <
+        );
     }
 
     // The test cases labeled "Via SMT" above were found by passing the following
-    // code into the Z3 SMT solver, and then manually flipping the `>` to `<` as
-    // approppiate for each test case.
+    // code into the Z3 SMT solver, and then manually flipping the `>` to `<`, 
+    // and/or commenting out the intersection check, as appropriate for each test 
+    // case. The particular online version I used raised an "unsupported" error when
+    // I tried to use `let`, which is why I repeated subexpressions so much.
     /*
 
     ; Variable declarations
@@ -1016,16 +1042,16 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
     (declare-fun y1 () Real)
     (declare-fun x2 () Real)
     (declare-fun y2 () Real)
-
+    
     (declare-fun x3 () Real)
     (declare-fun y3 () Real)
     (declare-fun x4 () Real)
     (declare-fun y4 () Real)
-
+    
     ;
     ; Constraints
     ;
-
+    
     ; Lines not points
     (assert (not
         (and
@@ -1039,7 +1065,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
             (= y3 y4)
         )
     ))
-
+    
     ; d has right sign
     (assert (>
         (-
@@ -1054,7 +1080,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         0
     ))
-
+    
     ; t * d has right sign
     (assert (>
         (-
@@ -1069,7 +1095,7 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         0
     ))
-
+    
     ; u * d has right sign
     (assert (>
         (-
@@ -1084,8 +1110,122 @@ mod lines_collide_can_return_both_values_when_the_collision_values_are {
         )
         0
     ))
-
-
+    
+    ; the lines intersect if 0 <= t <= 1 and 0 <= u <= 1
+    ; 0 <= t
+    (assert (<=
+        0
+        (/
+           ; t * d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+    ))
+    ; t <= 1
+    (assert (<=
+        (/
+           ; t * d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+        1
+    ))
+    
+    ; 0 <= u
+    (assert (<=
+        0
+        (/
+           ; u * d
+           (-
+              (*
+                (- x1 x3)
+                (- y1 y2)
+              )
+              (*
+                (- y1 y3)
+                (- x1 x2)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+    ))
+    ; u <= 1
+    (assert (<=
+        (/
+           ; u * d
+           (-
+              (*
+                (- x1 x3)
+                (- y1 y2)
+              )
+              (*
+                (- y1 y3)
+                (- x1 x2)
+              )
+           )
+           ; d
+           (-
+              (*
+                (- x1 x2)
+                (- y3 y4)
+              )
+              (*
+                (- x3 x4)
+                (- y1 y2)
+              )
+           )
+        )
+        1
+    ))
+    
     ; Solve
     (check-sat)
     (get-model)
