@@ -781,6 +781,7 @@ type Triangles = Vec<zo::XY>;
 type Line = (zo::XY, zo::XY);
 
 fn lines_collide(l1: Line, l2: Line) -> bool {
+    if l1 == l2 { return true }
     // This is based on this wikipedia page:
     // https://en.wikipedia.org/wiki/Line%E2%80%93line_intersection#Given_two_points_on_each_line_segment
 
@@ -889,9 +890,30 @@ fn lines_collide_acts_as_expected_on_these_origin_crossing_examples() {
 
     for l1 in [L1, L2, L3, L4] {
         for l2 in [L1, L2, L3, L4] {
-            assert!(lines_collide(l1, l2));
+            assert!(lines_collide(l1, l2), "{:?} {:?}", l1, l2);
         }
     }
+}
+
+#[test]
+fn lines_collide_detects_this_co_incident_line_example() {
+    // Short for half-length;
+    const H: zo::Zo = 1.;
+
+    const L1: Line = (zo_xy!{   -H,   -H}, zo_xy!{   H,   H});
+    const L2: Line = (zo_xy!{-H/2.,-H/2.}, zo_xy!{H/2.,H/2.});
+
+    assert!(lines_collide(L1, L2), "{:?} {:?}", L1, L2);
+}
+
+#[test]
+fn lines_collide_detects_this_identical_line_example() {
+    // Short for half-length;
+    const H: zo::Zo = 1.;
+
+    const L1: Line = (zo_xy!{0.,-H}, zo_xy!{0., H});
+
+    assert!(lines_collide(L1, L1));
 }
 
 #[cfg(test)]
