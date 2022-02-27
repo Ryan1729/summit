@@ -2820,11 +2820,12 @@ pub fn update(
 
         commands.push(Text(TextSpec{
             text: format!(
-                "sizes: {:?}\nanimation_timer: {:?}\ncursor_rel_xy: {}\nplayer.xy: {}\n",
+                "sizes: {:?}\nanimation_timer: {:?}\ncursor_rel_xy: {}\nplayer.xy: {}\nbounce.xy: {}\n",
                 state.sizes,
                 state.animation_timer,
                 cursor_rel_xy,
                 state.board.player.xy,
+                would_have_bounced.map(|p| p.xy.to_string()).unwrap_or("".to_string()),
             ),
             xy: DrawXY { x: left_text_x, y },
             wh: DrawWH {
