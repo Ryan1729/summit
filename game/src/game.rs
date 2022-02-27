@@ -1462,14 +1462,9 @@ fn bounce_vector_if_overlapping(
                             line_normal_b
                         };
 
-                        let mut bounce_vector = 2.
+                        let bounce_vector = 2.
                             * line_normal
                             * line_normal.dot(player.velocity);
-
-                        // We want the bounce to be forceful enough that the collision
-                        // stops, so we arbitrairaly scale it up to get that effect.
-                        // TODO Derive a value here in a principled way?
-                        bounce_vector *= 16.;
 
                         return Some(bounce_vector)
                     }
@@ -2360,7 +2355,7 @@ pub type CursorXY = DrawXY;
 
 pub type DeltaTimeInSeconds = f32;
 
-pub const CAMERA_SCALE_FACTOR: f32 = 24.;//256.;
+pub const CAMERA_SCALE_FACTOR: f32 = 256.;
 
 pub fn update(
     state: &mut State,
@@ -2571,8 +2566,6 @@ pub fn update(
                 mountain_colour = draw::Colour::Flag;
 
                 would_have_bounced = Some(new_player);
-                // prevent overlapping
-                state.board.player.velocity = zo_xy!{};
             } else {
                 mountain_colour = draw::Colour::Pole;
 
