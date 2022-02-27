@@ -2551,8 +2551,7 @@ pub fn update(
             // re-integrate including collision response
             new_player = state.board.player.clone();
 
-            //new_player.velocity -= bounce_vector;
-            new_player.velocity += bounce_vector;
+            new_player.velocity -= bounce_vector;
 
             new_player.xy += new_player.velocity * dt;
             if left_mouse_button_down {
