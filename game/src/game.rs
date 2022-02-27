@@ -2571,6 +2571,11 @@ pub fn update(
 
                 state.board.player = new_player;
             }
+
+            const COEFFICIENT_OF_RESTITUTION: zo::Zo = 1./2.;
+
+            // Slowly lose velocity due to an in-elastic collision
+            state.board.player.velocity *= -COEFFICIENT_OF_RESTITUTION;
         } else {
             mountain_colour = draw::Colour::Stone;
 
