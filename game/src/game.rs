@@ -2519,6 +2519,7 @@ pub fn update(
     // apply forces
     state.board.player.velocity += player_impulse * dt;
 
+    let mut would_have_bounced = None;
     let mountain_colour;
 
     if state.board.player.xy.y.0 < 0.
@@ -2564,6 +2565,7 @@ pub fn update(
             ).is_some() {
                 mountain_colour = draw::Colour::Flag;
 
+                would_have_bounced = Some(new_player);
                 // prevent overlapping
                 state.board.player.velocity = zo_xy!{};
             } else {
@@ -2744,6 +2746,23 @@ pub fn update(
         draw::Colour::Arrow
     ));
 
+    //
+    // Debugging player(s) {
+    //
+    if let Some(p) = would_have_bounced {
+        commands.push(TriangleStrip(
+            convert_strip!(p.get_triangles()),
+            draw::Colour::Pole
+        ));
+        
+    }
+    //
+    // }
+    //
+
+    //
+    // Debugging Lines {
+    //
     let mountain_points: Vec<_> = convert_strip!(vec![
         state.board.triangles[2],
         state.board.triangles[0],
@@ -2771,6 +2790,9 @@ pub fn update(
             draw::Colour::Flag
         ));
     }
+    //
+    // }
+    //
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
