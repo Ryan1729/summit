@@ -10,4 +10,5 @@ path = "./src/game.rs"
 [dependencies]
 
 [features]
-
+default = []
+fake-fixed-dt = []

@@ -2370,6 +2370,12 @@ pub fn update(
     draw_wh: DrawWH,
     dt: DeltaTimeInSeconds
 ) {
+    #[cfg(feature = "fake-fixed-dt")]
+    let dt = {
+        drop(dt); // Hush unused lint
+        1./60.
+    };
+
     use draw::{TextSpec, TextKind, Command::*};
 
     if draw_wh != state.sizes.draw_wh {
