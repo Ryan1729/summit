@@ -2754,45 +2754,39 @@ pub fn update(
             convert_strip!(p.get_triangles()),
             draw::Colour::Pole
         ));
-        
     }
     //
     // }
     //
 
+
     //
-    // Debugging Lines {
+    // Debugging Lines
     //
-    let mountain_points: Vec<_> = convert_strip!(vec![
-        state.board.triangles[2],
-        state.board.triangles[0],
-    ]);
+    #[cfg(any())]
+    {
+        let mountain_points: Vec<_> = convert_strip!(vec![
+            state.board.triangles[2],
+            state.board.triangles[0],
+        ]);
 
-    let player_triangles = state.board.player.get_triangles();
+        let player_triangles = state.board.player.get_triangles();
 
-    let player_points: Vec<_> = convert_strip!(player_triangles.clone());
+        let player_points: Vec<_> = convert_strip!(player_triangles.clone());
 
-    let lines = [
-        (mountain_points[0], mountain_points[1]),
-        (player_points[13], player_points[14]),
-        (player_points[15], player_points[13]),
-    ];
+        let lines = [
+            (mountain_points[0], mountain_points[1]),
+            (player_points[13], player_points[14]),
+            (player_points[15], player_points[13]),
+        ];
 
-    dbg!([
-        (state.board.triangles[2], state.board.triangles[0]),
-        (player_triangles[13], player_triangles[14]),
-        (player_triangles[15], player_triangles[13]),
-    ]);
-
-    for line in lines {
-        commands.push(Line(
-            line,
-            draw::Colour::Flag
-        ));
+        for line in lines {
+            commands.push(Line(
+                line,
+                draw::Colour::Flag
+            ));
+        }
     }
-    //
-    // }
-    //
 
     let left_text_x = state.sizes.play_xywh.x + MARGIN;
 
