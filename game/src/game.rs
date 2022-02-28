@@ -1497,6 +1497,43 @@ fn bounce_vector_if_overlapping_detects_this_overlap() {
     );
 }
 
+fn attempt_to_find_non_overlapping(
+    player: &Player,
+    mountain_triangles: &Triangles
+) -> Option<Player> {
+    let player = *player;
+
+    const UNIT: zo::Zo = 1./32768.;
+
+    // TODO Make order based on actual bounce vector.
+    let offsets = [
+        zo_xy!{UNIT, 0.},
+        zo_xy!{UNIT, UNIT}, // TODO sqrt(2)?
+        zo_xy!{0., UNIT},
+        zo_xy!{-UNIT, UNIT},
+        zo_xy!{-UNIT, 0.},
+        zo_xy!{-UNIT, -UNIT},
+        zo_xy!{0., -UNIT},
+        zo_xy!{UNIT, -UNIT},
+    ];
+
+    for offset in offsets {
+        let new_player = Player {
+            xy: player.xy + offset,
+            ..player
+        };
+
+        if bounce_vector_if_overlapping(
+            &new_player,
+            &mountain_triangles
+        ).is_none() {
+            return Some(new_player)
+        }
+    }
+
+    None
+}
+
 pub const TOP_Y: f32 = 1.0;
 pub const BOTTOM_Y: f32 = 0.0;
 
@@ -2566,6 +2603,13 @@ pub fn update(
                 mountain_colour = draw::Colour::Flag;
 
                 would_have_bounced = Some(new_player);
+
+                if let Some(found_player) = attempt_to_find_non_overlapping(
+                    &new_player,
+                    &state.board.triangles
+                ) {
+                    state.board.player = found_player;
+                }
             } else {
                 mountain_colour = draw::Colour::Pole;
 
