@@ -1497,6 +1497,9 @@ fn bounce_vector_if_overlapping_detects_this_overlap() {
     );
 }
 
+// TODO Replace with a resumable spiral iterator, and keep trying for some fixed
+// amount of times each frame, so we are absolutely never permanently stuck.
+// See https://gamedev.stackexchange.com/a/157307
 fn attempt_to_find_non_overlapping(
     player: &Player,
     mountain_triangles: &Triangles
