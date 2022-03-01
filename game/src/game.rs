@@ -1502,12 +1502,14 @@ type SpiralIndex = usize;
 /// 1 coresponds to no offset at all, with this indexing scheme.
 const INITIAL_INDEX: SpiralIndex = 2;
 
+const SPIRAL_UNIT: zo::Zo = 1./32768.;
+
 fn offset_from_spiral_index(index: SpiralIndex) -> zo::XY {
     if index < INITIAL_INDEX {
         return zo_xy!{0., 0.}
     }
 
-    const UNIT: zo::Zo = 1./32768.;
+    const UNIT: zo::Zo = SPIRAL_UNIT;
 
     // TODO expand search with higher indexes
     let offsets = [
@@ -1521,12 +1523,36 @@ fn offset_from_spiral_index(index: SpiralIndex) -> zo::XY {
         zo_xy!{UNIT, -UNIT},
     ];
 
-    offsets[index % offsets.len()]
+    offsets[index.saturating_sub(INITIAL_INDEX) % offsets.len()]
 }
 
-// TODO Replace with a resumable spiral iterator, and keep trying for some fixed
-// amount of times each frame, so we are absolutely never permanently stuck.
-// See https://gamedev.stackexchange.com/a/157307
+#[test]
+fn offset_from_spiral_index_produces_the_expected_result_for_the_first_n_cases() {
+    macro_rules! a {
+        ($index: expr, $expected_x: expr, $expected_y: expr) => {
+            assert_eq!(
+                offset_from_spiral_index($index),
+                zo_xy!{$expected_x, $expected_y},
+                "index {}",
+                $index
+            )
+        }
+    }
+
+    const UNIT: zo::Zo = SPIRAL_UNIT;
+
+    a!(INITIAL_INDEX - 1, 0., 0.);
+    a!(INITIAL_INDEX + 0, UNIT, 0.);
+    a!(INITIAL_INDEX + 1, UNIT, UNIT);
+    a!(INITIAL_INDEX + 2, 0., UNIT);
+    a!(INITIAL_INDEX + 3, -UNIT, UNIT);
+    a!(INITIAL_INDEX + 4, -UNIT, 0.);
+    a!(INITIAL_INDEX + 5, -UNIT, -UNIT);
+    a!(INITIAL_INDEX + 6, 0., -UNIT);
+    a!(INITIAL_INDEX + 7, UNIT, -UNIT);
+    a!(INITIAL_INDEX + 8, UNIT * 2., -UNIT);
+}
+
 fn attempt_to_find_non_overlapping(
     spiral_index: &mut SpiralIndex,
     player: &Player,
