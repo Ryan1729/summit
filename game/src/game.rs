@@ -1497,18 +1497,19 @@ fn bounce_vector_if_overlapping_detects_this_overlap() {
     );
 }
 
-// TODO Replace with a resumable spiral iterator, and keep trying for some fixed
-// amount of times each frame, so we are absolutely never permanently stuck.
-// See https://gamedev.stackexchange.com/a/157307
-fn attempt_to_find_non_overlapping(
-    player: &Player,
-    mountain_triangles: &Triangles
-) -> Option<Player> {
-    let player = *player;
+type SpiralIndex = usize;
+
+/// 1 coresponds to no offset at all, with this indexing scheme.
+const INITIAL_INDEX: SpiralIndex = 2;
+
+fn offset_from_spiral_index(index: SpiralIndex) -> zo::XY {
+    if index < INITIAL_INDEX {
+        return zo_xy!{0., 0.}
+    }
 
     const UNIT: zo::Zo = 1./32768.;
 
-    // TODO Make order based on actual bounce vector.
+    // TODO expand search with higher indexes
     let offsets = [
         zo_xy!{UNIT, 0.},
         zo_xy!{UNIT, UNIT}, // TODO sqrt(2)?
@@ -1520,7 +1521,28 @@ fn attempt_to_find_non_overlapping(
         zo_xy!{UNIT, -UNIT},
     ];
 
-    for offset in offsets {
+    offsets[index % offsets.len()]
+}
+
+// TODO Replace with a resumable spiral iterator, and keep trying for some fixed
+// amount of times each frame, so we are absolutely never permanently stuck.
+// See https://gamedev.stackexchange.com/a/157307
+fn attempt_to_find_non_overlapping(
+    spiral_index: &mut SpiralIndex,
+    player: &Player,
+    mountain_triangles: &Triangles,
+) -> Option<Player> {
+    if *spiral_index < INITIAL_INDEX {
+        *spiral_index = INITIAL_INDEX;
+    }
+
+    const ATTEMPTS_PER_NON_OVERLAPPING_CALL: SpiralIndex = 16;
+
+    let player = *player;
+
+    for _ in 0..ATTEMPTS_PER_NON_OVERLAPPING_CALL {
+        let offset = offset_from_spiral_index(*spiral_index);
+
         let new_player = Player {
             xy: player.xy + offset,
             ..player
@@ -1532,6 +1554,8 @@ fn attempt_to_find_non_overlapping(
         ).is_none() {
             return Some(new_player)
         }
+
+        *spiral_index = spiral_index.wrapping_add(1);
     }
 
     None
@@ -2074,6 +2098,7 @@ struct Board {
     triangles: Triangles,
     summit: zo::XY,
     player: Player,
+    spiral_index: SpiralIndex,
 }
 
 const SUMMIT_EXTRA: f32 = 0.0015;
@@ -2222,6 +2247,7 @@ impl Board {
                 xy: zo_xy!{0., 0.007625},
                 ..<_>::default()
             },
+            ..<_>::default()
         }
     }
 }
@@ -2608,9 +2634,11 @@ pub fn update(
                 would_have_bounced = Some(new_player);
 
                 if let Some(found_player) = attempt_to_find_non_overlapping(
+                    &mut state.board.spiral_index,
                     &new_player,
                     &state.board.triangles
                 ) {
+                    state.board.spiral_index = INITIAL_INDEX;
                     state.board.player = found_player;
                 }
             } else {
