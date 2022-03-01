@@ -1500,7 +1500,69 @@ fn bounce_vector_if_overlapping_detects_this_overlap() {
 type SpiralIndex = usize;
 
 /// 1 coresponds to no offset at all, with this indexing scheme.
-const INITIAL_INDEX: SpiralIndex = 2;
+const INITIAL_INDEX: SpiralIndex = 1;
+
+type SpiralRing = SpiralIndex;
+///  [16][15][14][13][12] .
+///  [17][ 4][ 3][ 2][11] .
+///  [18][ 5][ 0][ 1][10] .
+///  [19][ 6][ 7][ 8][ 9][26]
+///  [20][21][22][23][24][25]
+///
+///  Consider the `0` to be in ring `0`, and 1 to 8 to be in ring 1, and 9 to 24 to
+///  be in ring 2, and so on. This function goes from the index to what ring it is.
+fn ring_from_spiral_index(index: SpiralIndex) -> SpiralRing {
+    // Note that starting at the center and going diagonally down-right are the
+    // highest number in each ring. This sequence goes 0, 8, 24, 48, 80...
+    // These are one less than the perfect squares, skipping every second term.
+    //
+    // What we want to do is map 0 to 0, [1,8] to 1, [9,24] to 2, ...
+    //
+    // If we take our original sequence:
+    // 0, 8, 24, 48, 80...
+    // ... add 1 ...
+    // 1, 9, 25, 49, 81...
+    // .. take the square root ...
+    // 1, 3, 5, 7, 9...
+    // ... add 1 again ...
+    // 2, 4, 6, 8, 10...
+    // ... perform integer division by 2 ...
+    // 1, 2, 3, 4, 5...
+    // ... and finally subtract 1 ...
+    // 0, 1, 2, 3, 4...
+    // We get our desired sequence
+    //
+    // Below, we leave off the initial plus 1 and final minus 1 to account for
+    // rounding ... or something. To be honest I figured out that those were getting
+    // in the way, by trial and error.
+
+    ((index as f32).sqrt() + 1.) as SpiralRing / 2
+}
+
+#[test]
+fn ring_from_spiral_index_returns_expected_results_for_the_first_n_examples() {
+    macro_rules! a {
+        ($index: expr, $expected: expr) => {
+            assert_eq!(
+                ring_from_spiral_index($index),
+                $expected,
+                "index {}",
+                $index
+            )
+        }
+    }
+
+    a!(0, 0);
+    for i in 1..9 {
+        a!(i, 1);
+    }
+    for i in 9..25 {
+        a!(i, 2);
+    }
+    for i in 25..49 {
+        a!(i, 3);
+    }
+}
 
 const SPIRAL_UNIT: zo::Zo = 1./32768.;
 
@@ -1511,19 +1573,54 @@ fn offset_from_spiral_index(index: SpiralIndex) -> zo::XY {
 
     const UNIT: zo::Zo = SPIRAL_UNIT;
 
-    // TODO expand search with higher indexes
-    let offsets = [
-        zo_xy!{UNIT, 0.},
-        zo_xy!{UNIT, UNIT}, // TODO sqrt(2)?
-        zo_xy!{0., UNIT},
-        zo_xy!{-UNIT, UNIT},
-        zo_xy!{-UNIT, 0.},
-        zo_xy!{-UNIT, -UNIT},
-        zo_xy!{0., -UNIT},
-        zo_xy!{UNIT, -UNIT},
-    ];
+    let ring = ring_from_spiral_index(index);
 
-    offsets[index.saturating_sub(INITIAL_INDEX) % offsets.len()]
+    assert!(ring <= index);
+
+    //  [16][15][14][13][12] .
+    //  [17][ 4][ 3][ 2][11] .
+    //  [18][ 5][ 0][ 1][10] .
+    //  [19][ 6][ 7][ 8][ 9][26]
+    //  [20][21][22][23][24][25]
+    //
+    //  We can think of each ring, (after ring 0) as being made of 4 strips.
+    //  The first set of strips is 1 to 2, and 3 to 4, and 5 to 6, and 7 to 8.
+    //  The second is 9 to 12, and 13 to 16, and 17 to 20, and 21 to 24.
+
+    let strip_length = 2 * ring;
+
+    let min_index_for_current_ring = (2 * ring).saturating_sub(1).pow(2);
+
+    // The excess amount along the strip to go
+    let along = if index == 0 {
+        0
+    } else {
+        (((index - min_index_for_current_ring) % strip_length) as isize)
+        - (ring as isize - 1)
+    } as zo::Zo * UNIT;
+    // How many units out from the center to go;
+    let out = ring as zo::Zo * UNIT;
+    // Note that both of the above variables are 0 for index 0, since ring is also 0
+    // in that case.
+
+    // In the 4th strip, like 7 to 8.
+    if index > min_index_for_current_ring - 1 + strip_length * 3 {
+        return zo_xy!{along, -out}
+    }
+
+    // In the 3rd strip, like 5 to 6.
+    if index > min_index_for_current_ring - 1 + strip_length * 2 {
+        return zo_xy!{-out, -along}
+    }
+
+    // In the 2nd strip, like 3 to 4.
+    if index > min_index_for_current_ring - 1 + strip_length {
+        return zo_xy!{-along, out}
+    }
+
+    // Must be in the 1st strip like 1 to 2, or index 0, which also works here,
+    // without involving `-0.0`.
+    zo_xy!{out, along}
 }
 
 #[test]
@@ -1551,6 +1648,27 @@ fn offset_from_spiral_index_produces_the_expected_result_for_the_first_n_cases()
     a!(INITIAL_INDEX + 6, 0., -UNIT);
     a!(INITIAL_INDEX + 7, UNIT, -UNIT);
     a!(INITIAL_INDEX + 8, UNIT * 2., -UNIT);
+    a!(INITIAL_INDEX + 9, UNIT * 2., 0.);
+    a!(INITIAL_INDEX + 10, UNIT * 2., UNIT);
+    a!(INITIAL_INDEX + 11, UNIT * 2., UNIT * 2.);
+    a!(INITIAL_INDEX + 12, UNIT, UNIT * 2.);
+    a!(INITIAL_INDEX + 13, 0., UNIT * 2.);
+    a!(INITIAL_INDEX + 14, -UNIT, UNIT * 2.);
+    a!(INITIAL_INDEX + 15, -UNIT * 2., UNIT * 2.);
+    a!(INITIAL_INDEX + 16, -UNIT * 2., UNIT);
+    a!(INITIAL_INDEX + 17, -UNIT * 2., 0.);
+    a!(INITIAL_INDEX + 18, -UNIT * 2., -UNIT);
+    a!(INITIAL_INDEX + 19, -UNIT * 2., -UNIT * 2.);
+    a!(INITIAL_INDEX + 20, -UNIT, -UNIT * 2.);
+    a!(INITIAL_INDEX + 21, 0., -UNIT * 2.);
+    a!(INITIAL_INDEX + 22, UNIT, -UNIT * 2.);
+    a!(INITIAL_INDEX + 23, UNIT * 2., -UNIT * 2.);
+    a!(INITIAL_INDEX + 24, UNIT * 3., -UNIT * 2.);
+    a!(INITIAL_INDEX + 25, UNIT * 3., -UNIT);
+    a!(INITIAL_INDEX + 26, UNIT * 3., 0.);
+    a!(INITIAL_INDEX + 27, UNIT * 3., UNIT);
+    a!(INITIAL_INDEX + 28, UNIT * 3., UNIT * 2.);
+    a!(INITIAL_INDEX + 29, UNIT * 3., UNIT * 3.);
 }
 
 fn attempt_to_find_non_overlapping(
