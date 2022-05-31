@@ -1,4 +1,4 @@
-#![deny(unused)]
+//#![deny(unused)]
 #![deny(bindings_with_variant_name)]
 
 #[allow(unused)]
@@ -2808,17 +2808,19 @@ pub fn update(
     // Render
     //
 
-    for i in 0..TILES_LENGTH {
-        let tile_data = state.board.tiles.tiles[i];
-
-        let txy = tile::i_to_xy(i);
-
-        commands.push(Sprite(SpriteSpec{
-            sprite: tile_data.sprite(),
-            xy: draw_xy_from_tile(&state.sizes, txy),
-        }));
+    #[cfg(any())]
+    {
+        for i in 0..TILES_LENGTH {
+            let tile_data = state.board.tiles.tiles[i];
+    
+            let txy = tile::i_to_xy(i);
+    
+            commands.push(Sprite(SpriteSpec{
+                sprite: tile_data.sprite(),
+                xy: draw_xy_from_tile(&state.sizes, txy),
+            }));
+        }
     }
-
     commands.push(Sprite(SpriteSpec{
         sprite: state.board.eye.state.sprite(),
         xy: draw_xy_from_tile(&state.sizes, state.board.eye.xy),
