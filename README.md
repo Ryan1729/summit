@@ -1,5 +1,7 @@
 # Summit
 
+![screenshot](/screenshot.png?raw=true "A side view of a green stick-figure-like representation of a person, and a matching green arrow floating next to some grey polygons, that themselves evoke the idea of a mountain.")
+
 This is a game inspired by [Mt.](https://lukeoc.itch.io/mt)
 
 # Building/Running
